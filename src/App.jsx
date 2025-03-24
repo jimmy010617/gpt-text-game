@@ -1,9 +1,8 @@
 // src/App.jsx
 import { useState } from 'react';
-import config from './assets/apikey';
 
 // 💡 OpenAI API Key를 입력해주세요 (보안상 유의 - 실제 배포 시 백엔드 처리 권장)
-const VITE_OPENAI_API_KEY = config.TEXT_API_KEY;
+const VITE_OPENAI_API_KEY = ProcessingInstruction.env.TEXT_API_KEY;
 
 function App() {
   // 📦 상태 선언
