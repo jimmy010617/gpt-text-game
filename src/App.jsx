@@ -98,7 +98,10 @@ function App() {
       '  "itemsAdd": ["아이템명"...],\n' +
       '  "itemsRemove": ["아이템명"...],\n' +
       '  "hudNotes": ["괴물과 싸워 ATK +1","피해를 받아 HP -10"]\n' +
-      "}";
+      "}"
+      +"JSON 내용을 포맷처럼 하되 내용을 다양하게."
+    
+      ;
 
     const content =
       (systemHint ? `${systemHint}\n\n` : "") +
