@@ -1,5 +1,5 @@
 // src/App.jsx
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, useRef } from "react";
 import { GoogleGenAI } from "@google/genai";
 
 // 🔑 ENV
@@ -9,32 +9,68 @@ const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 const TEXT_MODEL = "gemini-2.5-flash-lite"; // 스토리 + 메인오브젝트 + 스탯증감 동시 추출 (스탯 기반 분기 포함)
 const IMAGE_MODEL = "imagen-3.0-generate-002"; // Imagen 3 (과금 필요)
 
+
+// 게임 상태 자동으로 불러오기
+const loadInitialState = () => {
+  try {
+    const autoSavedState = localStorage.getItem("ai_game_auto_save");
+    if (autoSavedState) {
+      const gameState = JSON.parse(autoSavedState);
+      alert("자동 저장된 게임을 불러왔습니다!"); // 불러오기 성공 알림을 여기에 둡니다.
+      return {
+        story: gameState.story ?? "",
+        typingStory: "",
+        userAction: "",
+        isTextLoading: false,
+        isImgLoading: false,
+        isGameOver: gameState.isGameOver ?? false,
+        hp: gameState.hp ?? 100,
+        atk: gameState.atk ?? 10,
+        mp: gameState.mp ?? 30,
+        items: gameState.items ?? ["허름한 검", "빵 한 조각"],
+        survivalTurns: gameState.survivalTurns ?? 0,
+        sceneImageUrl: gameState.sceneImageUrl ?? "",
+        imgError: "",
+        lastDelta: { hp: 0, atk: 0, mp: 0 },
+        lastSurvivalTurn: "",
+        hudNotes: [],
+        recommendedAction: gameState.recommendedAction ?? "",
+        isTypingFinished: false,
+      };
+    }
+  } catch (e) {
+    console.error("자동 저장된 게임 불러오기 실패:", e);
+  }
+  
+  // 저장된 게임이 없으면 기본 초기 상태를 반환합니다.
+  return {
+    story: "",
+    userAction: "",
+    isTextLoading: false,
+    isImgLoading: false,
+    isGameOver: false,
+    hp: 100,
+    atk: 10,
+    mp: 30,
+    items: ["허름한 검", "빵 한 조각"],
+    survivalTurns: 0,
+    sceneImageUrl: "",
+    imgError: "",
+    lastDelta: { hp: 0, atk: 0, mp: 0 },
+    lastSurvivalTurn: "",
+    hudNotes: [],
+    recommendedAction: "",
+    };
+  };
+
 function App() {
   // 📦 게임 상태
-  const [story, setStory] = useState("");
-  const [userAction, setUserAction] = useState("");
-  const [isTextLoading, setIsTextLoading] = useState(false);
-  const [isImgLoading, setIsImgLoading] = useState(false);
-  const [isGameOver, setIsGameOver] = useState(false);
-
-  // 🔧 HUD
-  const [hp, setHp] = useState(100);
-  const [atk, setAtk] = useState(10);
-  const [mp, setMp] = useState(30);
-  const [items, setItems] = useState(["허름한 검", "빵 한 조각"]);
-  const [survivalTurns, setSurvivalTurns] = useState(0);
-
-  // 🎨 현재 상황 일러스트
-  const [sceneImageUrl, setSceneImageUrl] = useState("");
-  const [imgError, setImgError] = useState("");
+  const [gameState, setGameState] = useState(loadInitialState);
+  const storyRef = useRef(null);
 
   // 🧩 옵션 팝업 & 체크박스 상태
   const [showOptions, setShowOptions] = useState(false);
   const [withImage, setWithImage] = useState(false);
-
-  // 🔔 최근 스탯 변화 뱃지 + 내역
-  const [lastDelta, setLastDelta] = useState({ hp: 0, atk: 0, mp: 0 });
-  const [hudNotes, setHudNotes] = useState([]); // ["괴물과 싸워 ATK +1", "피해를 받아 HP -10" ... 최대 n개 유지)
 
   // 💾 저장/불러오기 관련 상태
   const [currentSlot, setCurrentSlot] = useState(1);
@@ -49,6 +85,14 @@ function App() {
   useEffect(() => {
     localStorage.setItem("withImage", String(withImage));
   }, [withImage]);
+  
+  // 🔄 자동 스크롤
+  useEffect(() => {
+    if (storyRef.current) {
+      storyRef.current.scrollTop = storyRef.current.scrollHeight;
+    }
+  }, [gameState.story]);
+
 
   // 앱 시작 시 저장된 슬롯을 확인하는 useEffect
   useEffect(() => {
@@ -66,13 +110,62 @@ function App() {
     setSlots(slotsData);
   }, []);
 
+  // 🔄 자동 저장 기능
+    useEffect(() => {
+        const { story, hp, atk, mp, items, survivalTurns, sceneImageUrl, isGameOver, recommendedAction } = gameState;
+        const autoSaveState = { story, hp, atk, mp, items, survivalTurns, sceneImageUrl, isGameOver, recommendedAction };
+        try {
+            localStorage.setItem("ai_game_auto_save", JSON.stringify(autoSaveState));
+            console.log("자동 저장 완료!");
+        } catch (e) {
+            console.error("자동 저장 실패:", e);
+        }
+    }, [gameState.story, gameState.hp, gameState.atk, gameState.mp, gameState.items, 
+        gameState.survivalTurns, gameState.sceneImageUrl, gameState.isGameOver, gameState.recommendedAction]);  // ⬅️ gameState 객체 전체가 변경될 때마다 자동 저장 실행
+
+  // ⌨️ 타이핑 효과 구현
+    useEffect(() => {
+    // 스토리 내용이 없거나 게임 오버 상태면 중단
+    if (!gameState.story || gameState.isGameOver) {
+        setGameState(prev => ({ ...prev, typingStory: prev.story, isTypingFinished: true }));
+        return;
+    }
+
+    // 새로운 스토리가 시작되면 타이핑 완료 상태를 false로 초기화합니다.
+    setGameState(prev => ({ ...prev, isTypingFinished: false }));
+
+    // 타이핑 애니메이션 속도 (숫자가 낮을수록 빠름)
+    const speed = 30;
+    let i = 0;
+    
+    // setInterval을 사용해 일정 시간마다 한 글자씩 추가
+    const typingInterval = setInterval(() => {
+        if (i < gameState.story.length) {
+        setGameState(prev => ({
+            ...prev,
+            typingStory: prev.story.substring(0, i + 1)
+        }));
+        i++;
+        } else {
+        // 모든 글자가 타이핑되면 인터벌 종료
+        clearInterval(typingInterval);
+            // ⭐️ 타이핑이 완료된 후 상태를 true로 변경합니다.
+            setGameState(prev => ({ ...prev, isTypingFinished: true }));
+        }
+    }, speed);
+
+    // 컴포넌트가 언마운트되거나 의존성 배열이 변경될 때 인터벌 정리
+    return () => {
+        clearInterval(typingInterval);
+    };
+  }, [gameState.story, gameState.isGameOver]); // story 또는 isGameOver 상태가 변경될 때마다 실행
 
   // 🔌 Gemini SDK
   const ai = useMemo(() => (GEMINI_API_KEY ? new GoogleGenAI({ apiKey: GEMINI_API_KEY }) : null), []);
 
   const ensureApi = () => {
     if (!ai) {
-      setStory("환경변수 VITE_GEMINI_API_KEY가 설정되지 않았습니다.");
+      setGameState(prev => ({ ...prev, story: "환경변수 VITE_GEMINI_API_KEY가 설정되지 않았습니다." }));
       return false;
     }
     return true;
@@ -101,7 +194,13 @@ function App() {
   // 🧠 (중요) 스토리+메인오브젝트+스탯증감 한 번에 받기 (현재 스탯 기반 분기)
   async function askStorySubjectAndDeltas({ systemHint, userText }) {
     // 현재 플레이어 상태를 모델에 전달 → 같은 상황이라도 스탯 차이에 따라 결과 분기
-    const playerState = { hp, atk, mp, items, survivalTurns };
+    const playerState = { 
+        hp: gameState.hp, 
+        atk: gameState.atk, 
+        mp: gameState.mp, 
+        items: gameState.items, 
+        survivalTurns: gameState.survivalTurns 
+    };
 
     // JSON 스키마 강제 (hudNotes 포함)
     const role =
@@ -110,16 +209,18 @@ function App() {
       "예) 같은 적을 만나도 ATK가 높으면 쉽게 제압(피해 적음), MP가 높으면 마법적 해결, 스탯이 낮으면 회피/도망/피해 증가 등.\n" +
       "이야기를 생성하면서 그 결과로 플레이어의 스탯/인벤토리 변화도 함께 산출합니다. " +
       "스탯은 정수 delta로만 표기(hp/atk/mp). 예: 괴물과 싸움→ atk+1, hp-10 / 책 읽음→ mp+1 / 피해→ hp-10. " +
-      "아이템 변동이 있으면 itemsAdd/itemsRemove에 넣고, HUD에서 보여줄 간단한 문구를 hudNotes 배열로 제공하세요. " +
+      "아이템 변동이 있으면 itemsAdd/itemsRemove에 넣으세요." +
       "또한 장면에서 '가장 중심이 되는 단일 물체' 1개(subject)를 뽑습니다(사람/군중/배경전체/추상 제외). " +
+      "사용자의 행동을 직접 입력하지 않고 클릭할 수 있도록 'recommendedAction'에 다음 추천 행동 1개를 한국어 문장으로 제시하세요. " +
+      "가능하면 가장 합리적인 행동을 추천하고, 너무 뻔한 행동은 피하세요.\n" +
       "반드시 JSON만 출력. 포맷:\n" +
       "{\n" +
       '  "story": "한국어 스토리...",\n' +
       '  "subject": { "ko": "버섯", "en": "a red mushroom" },\n' +
       '  "deltas": [ { "stat": "hp"|"atk"|"mp", "delta": -10, "reason": "적에게 맞음" }, ... ],\n' +
       '  "itemsAdd": ["아이템명"...],\n' +
-      '  "itemsRemove": ["아이템명"...],\n' +
-      '  "hudNotes": ["괴물과 싸워 ATK +1","피해를 받아 HP -10"]\n' +
+      '  "itemsRemove": ["아이템명"...]\n' +
+      '  "recommendedAction": "추천 행동 텍스트"\n'
       "}"
       +"JSON 내용을 포맷처럼 하되 내용을 다양하게."
     
@@ -154,63 +255,108 @@ function App() {
     const itemsAdd = Array.isArray(parsed.itemsAdd) ? parsed.itemsAdd : [];
     const itemsRemove = Array.isArray(parsed.itemsRemove) ? parsed.itemsRemove : [];
     const notes = Array.isArray(parsed.hudNotes) ? parsed.hudNotes : [];
+    const recommendedAction = (parsed.recommendedAction ?? "").trim();
 
-    return { nextStory, subject, deltas, itemsAdd, itemsRemove, notes };
+    return { nextStory, subject, deltas, itemsAdd, itemsRemove, notes, recommendedAction };
+  }
+
+  // 📝 스탯/아이템 변화로부터 HUD 노트 생성
+  function generateHudNotes({ deltas, itemsAdd, itemsRemove }) {
+    const notes = [];
+    
+    if (deltas && deltas.length) {
+        deltas.forEach(d => {
+            if (d.delta !== 0) {
+                const sign = d.delta > 0 ? "+" : "";
+                let reason = d.reason ? ` (${d.reason})` : "";
+                notes.push(`${d.stat.toUpperCase()} ${sign}${d.delta}${reason}`);
+            }
+        });
+    }
+
+    if (itemsAdd && itemsAdd.length) {
+        itemsAdd.forEach(item => {
+            notes.push(`새 아이템 획득: ${item}`);
+        });
+    }
+
+    if (itemsRemove && itemsRemove.length) {
+        itemsRemove.forEach(item => {
+            notes.push(`아이템 잃음: ${item}`);
+        });
+    }
+
+    return notes;
   }
 
   // 🧮 스탯/인벤토리 적용 + HUD 뱃지/노트 + 게임오버 체크
-  function applyDeltasAndItems({ deltas, itemsAdd, itemsRemove, notes }) {
-    let dHp = 0,
-      dAtk = 0,
-      dMp = 0;
-    for (const d of deltas || []) {
-      if (!d || typeof d.delta !== "number") continue;
-      if (d.stat === "hp") dHp += d.delta;
-      if (d.stat === "atk") dAtk += d.delta;
-      if (d.stat === "mp") dMp += d.delta;
-    }
+  function applyDeltasAndItems({ deltas, itemsAdd, itemsRemove }) { // ⬅️ notes 파라미터 제거
+    setGameState(prev => {
+        let newHp = prev.hp;
+        let newAtk = prev.atk;
+        let newMp = prev.mp;
+        let newItems = [...prev.items];
+        
+        // 🚀 자바스크립트에서 직접 HUD Note 생성
+        const newNotes = generateHudNotes({ deltas, itemsAdd, itemsRemove });
+        let newHudNotes = [...newNotes, ...prev.hudNotes].slice(0, 6);
+        
+        let newSurvivalTurns = prev.survivalTurns;
+        let lastSurvivalTurn = prev.lastSurvivalTurn;
+        let dHp = 0, dAtk = 0, dMp = 0;
 
-    // 스탯 적용
-    let newHp = hp + dHp;
-    let newAtk = atk + dAtk;
-    let newMp = mp + dMp;
+        for (const d of deltas || []) {
+            if (!d || typeof d.delta !== "number") continue;
+            if (d.stat === "hp") dHp += d.delta;
+            if (d.stat === "atk") dAtk += d.delta;
+            if (d.stat === "mp") dMp += d.delta;
+        }
 
-    if (newHp < 0) newHp = 0;
-    setHp(newHp);
-    setAtk(newAtk);
-    setMp(newMp);
+        newHp = newHp + dHp;
+        newAtk = newAtk + dAtk;
+        newMp = newMp + dMp;
+
+        if (itemsRemove?.length) newItems = newItems.filter((x) => !itemsRemove.includes(x));
+        if (itemsAdd?.length) newItems = [...newItems, ...itemsAdd];
+
+        // 게임오버 체크
+        const isGameOver = newHp <= 0;
+        
+        // 생존 턴 +1 (스토리 진행 성공 시)
+        if (!isGameOver) {
+            newSurvivalTurns += 1;
+            lastSurvivalTurn = "highlight";
+        }
+        
+        // 모든 상태를 하나의 객체로 반환
+        return {
+            ...prev,
+            hp: Math.max(0, newHp), // HP는 0 미만으로 내려가지 않도록
+            atk: newAtk,
+            mp: newMp,
+            items: newItems,
+            survivalTurns: newSurvivalTurns,
+            lastSurvivalTurn: lastSurvivalTurn,
+            hudNotes: newHudNotes, // ⬅️ 여기를 수정된 변수로 교체
+            isGameOver: isGameOver,
+            lastDelta: { hp: dHp, atk: dAtk, mp: dMp },
+        };
+    });
 
     // 증감 배지 (3초)
-    setLastDelta({ hp: dHp || 0, atk: dAtk || 0, mp: dMp || 0 });
-    setTimeout(() => setLastDelta({ hp: 0, atk: 0, mp: 0 }), 3000);
-
-    // 인벤토리 적용
-    if (itemsRemove?.length) setItems((arr) => arr.filter((x) => !itemsRemove.includes(x)));
-    if (itemsAdd?.length) setItems((arr) => [...arr, ...itemsAdd]);
-
-    // HUD 노트 (최근 것이 위로, 최대 6개 유지)
-    if (notes?.length) {
-      setHudNotes((prev) => {
-        const merged = [...notes, ...prev];
-        return merged.slice(0, 6);
-      });
-    }
-
-    // 게임오버 체크
-    if (newHp <= 0) {
-      setIsGameOver(true);
-      setStory((s) => (s ? s + "\n\n게임 끝" : "게임 끝"));
-    } else {
-      // 생존 턴 +1 (스토리 진행 성공 시)
-      setSurvivalTurns((t) => t + 1);
-    }
+    setTimeout(() => {
+        setGameState(prev => ({
+            ...prev,
+            lastDelta: { hp: 0, atk: 0, mp: 0 },
+            lastSurvivalTurn: "", // Reset after 3 seconds
+        }));
+    }, 3000);
   }
 
   // 🖼 이미지 생성 (subject로 바로)
   async function generateSceneImageFromSubject(subject) {
-    setImgError("");
+    setGameState(prev => ({ ...prev, imgError: "", isImgLoading: true }));
     if (!ensureApi()) return;
-    setIsImgLoading(true);
     try {
       const prompt = buildImagePromptFromSubject(subject);
       const res = await ai.models.generateImages({
@@ -219,66 +365,87 @@ function App() {
         config: { numberOfImages: 1 },
       });
       const bytes = res?.generatedImages?.[0]?.image?.imageBytes;
-      if (bytes) setSceneImageUrl(`data:image/png;base64,${bytes}`);
-      else setImgError("이미지가 반환되지 않았습니다. 프롬프트를 더 구체적으로 작성해 보세요.");
+      if (bytes) {
+        setGameState(prev => ({ ...prev, sceneImageUrl: `data:image/png;base64,${bytes}` }));
+      }
+      else {
+        setGameState(prev => ({ ...prev, imgError: "이미지가 반환되지 않았습니다. 프롬프트를 더 구체적으로 작성해 보세요." }));
+      }
     } catch (e) {
       const msg = String(e?.message ?? e);
       if (msg.includes("only accessible to billed users"))
-        setImgError("Imagen API는 결제 등록된 계정만 사용 가능합니다. (결제/쿼터 설정 필요)");
-      else if (/permission|quota|disabled|billing/i.test(msg)) setImgError("이미지 생성 권한/쿼터/과금 설정을 확인해주세요.");
-      else setImgError(`이미지 생성 오류: ${msg}`);
+        setGameState(prev => ({ ...prev, imgError: "Imagen API는 결제 등록된 계정만 사용 가능합니다. (결제/쿼터 설정 필요)" }));
+      else if (/permission|quota|disabled|billing/i.test(msg)) 
+        setGameState(prev => ({ ...prev, imgError: "이미지 생성 권한/쿼터/과금 설정을 확인해주세요." }));
+      else setGameState(prev => ({ ...prev, imgError: `이미지 생성 오류: ${msg}` }));
     } finally {
-      setIsImgLoading(false);
+      setGameState(prev => ({ ...prev, isImgLoading: false }));
     }
   }
 
   // 🎲 새로운 상황 생성 (한 번에 스토리+subject+deltas)
   const generateScenario = async () => {
     if (!ensureApi()) return;
-    setIsTextLoading(true);
-    setIsGameOver(false);
-    setSceneImageUrl("");
-    setImgError("");
-    setHudNotes([]); // 새 게임 느낌
+    setGameState(prev => ({ 
+        ...prev,
+        story: "",
+        typingStory: "", 
+        isTextLoading: true, 
+        isGameOver: false, 
+        sceneImageUrl: "", 
+        imgError: "", 
+        hudNotes: [],
+        survivalTurns: 0,
+        hp: 100,
+        atk: 10,
+        mp: 30,
+        items: ["허름한 검", "빵 한 조각"],
+        lastSurvivalTurn: "",
+        recommendedAction: "",
+    }));
 
     const chatPrompt =
       "장르는 특정하지 말고(현실/판타지/SF 등 가능) 플레이어에게 흥미로운 상황을 한국어로 5~8문장으로 제시하세요. " +
       "필요하면 선택지를 2~3개 제시하고, 마지막은 '행동을 입력하세요'로 끝내세요.";
 
     try {
-      const { nextStory, subject, deltas, itemsAdd, itemsRemove, notes } = await askStorySubjectAndDeltas({
+      const { nextStory, subject, deltas, itemsAdd, itemsRemove, recommendedAction } = await askStorySubjectAndDeltas({
         systemHint:
           "story는 자연스러운 한국어 문단으로. subject는 단일 물체 1개만(가능하면 색/형태 한 단어 포함). " +
           "deltas는 상황에 알맞게 hp/atk/mp를 정수로 증감. itemsAdd/Remove와 hudNotes도 필요시 채우기.",
         userText: chatPrompt,
       });
 
-      setStory(nextStory || "상황 생성 실패");
-      applyDeltasAndItems({ deltas, itemsAdd, itemsRemove, notes });
+      setGameState(prev => ({
+        ...prev,
+        story: nextStory || "상황 생성 실패",
+        recommendedAction: recommendedAction || "",
+      }));
+      applyDeltasAndItems({ deltas, itemsAdd, itemsRemove });
 
-      if (!isGameOver && withImage && subject) {
+      if (!gameState.isGameOver && withImage && subject) {
         await generateSceneImageFromSubject(subject);
       }
     } catch (e) {
       console.error(e);
-      setStory("상황 생성 중 오류가 발생했습니다.");
+      setGameState(prev => ({ ...prev, story: "상황 생성 중 오류가 발생했습니다." }));
     } finally {
-      setIsTextLoading(false);
+      setGameState(prev => ({ ...prev, isTextLoading: false }));
     }
   };
 
   // 📝 행동 제출 (한 번에 스토리+subject+deltas)
   const submitAction = async () => {
-    if (!ensureApi() || !story || isGameOver) return;
-    setIsTextLoading(true);
+    if (!ensureApi() || !gameState.story || gameState.isGameOver) return;
+    setGameState(prev => ({ ...prev, isTextLoading: true }));
 
     const actionPrompt =
-      `이전 상황(컨텍스트):\n${story}\n\n` +
-      `플레이어의 행동: ${userAction}\n\n` +
+      `이전 상황(컨텍스트):\n${gameState.story}\n\n` +
+      `플레이어의 행동: ${gameState.userAction}\n\n` +
       "게임 마스터처럼 자연스럽게 다음 전개를 서술하세요. 필요하면 선택지를 2~3개 제시하고, 마지막은 '행동을 입력하세요'로 끝내세요.";
 
     try {
-      const { nextStory, subject, deltas, itemsAdd, itemsRemove, notes } = await askStorySubjectAndDeltas({
+      const { nextStory, subject, deltas, itemsAdd, itemsRemove, notes, recommendedAction } = await askStorySubjectAndDeltas({
         systemHint:
           "story는 한국어 문단으로. subject는 단일 물체 1개만(가능하면 색/형태 한 단어 포함). " +
           "deltas는 상황에 맞춰 hp/atk/mp를 정수로 증감: 전투/피해/학습/회복/아이템 사용 등 반영. " +
@@ -287,25 +454,46 @@ function App() {
       });
 
       const out = nextStory || "이야기 생성 실패";
-      setStory(out);
-      setUserAction("");
+      setGameState(prev => ({ ...prev, story: out, userAction: "", recommendedAction: recommendedAction || "",}));
+      applyDeltasAndItems({ deltas, itemsAdd, itemsRemove });
 
-      applyDeltasAndItems({ deltas, itemsAdd, itemsRemove, notes });
-
-      if (!isGameOver && withImage && subject) {
+      if (!gameState.isGameOver && withImage && subject) {
         await generateSceneImageFromSubject(subject);
       }
     } catch (e) {
       console.error(e);
-      setStory("이야기 생성 중 오류가 발생했습니다.");
+      setGameState(prev => ({ ...prev, story: "이야기 생성 중 오류가 발생했습니다." }));
     } finally {
-      setIsTextLoading(false);
+      setGameState(prev => ({ ...prev, isTextLoading: false }));
     }
   };
 
   const goHome = () => {
-    alert("홈으로 가기");
-  };
+    // 모든 게임 상태를 초기화하고 새로운 시나리오를 생성합니다.
+    setGameState({
+        story: "",
+        userAction: "",
+        isTextLoading: false,
+        isImgLoading: false,
+        isGameOver: false,
+        hp: 100,
+        atk: 10,
+        mp: 30,
+        items: ["허름한 검", "빵 한 조각"],
+        survivalTurns: 0,
+        sceneImageUrl: "",
+        imgError: "",
+        lastDelta: { hp: 0, atk: 0, mp: 0 },
+        lastSurvivalTurn: "",
+        hudNotes: [],
+        recommendedAction: "",
+    });
+    
+    // 선택적으로, 곧바로 새로운 시나리오를 생성하고 싶다면 아래 함수를 호출하세요.
+    // generateScenario();
+    
+    alert("게임을 초기화했습니다!");
+    };
 
   // ⏳ 공통 스피너
   const Spinner = ({ label }) => (
@@ -332,8 +520,9 @@ function App() {
   };
 
   // 💾 게임 상태 저장 함수
-  const saveGame = (slotNumber, saveName) => { // ⬅️ 매개변수를 saveName으로 변경
-    const gameState = {
+  const saveGame = (slotNumber, saveName) => {
+    const { story, hp, atk, mp, items, survivalTurns, sceneImageUrl } = gameState;
+    const saveState = {
         story,
         hp,
         atk,
@@ -341,12 +530,20 @@ function App() {
         items,
         survivalTurns,
         sceneImageUrl,
-        name: saveName || `저장 #${slotNumber}`, // ⬅️ saveName을 할당
+        name: saveName || `저장 #${slotNumber}`,
         savedAt: new Date().toLocaleString(),
     };
     try {
-        localStorage.setItem(`ai_game_save_${slotNumber}`, JSON.stringify(gameState));
-        alert(`게임이 ${slotNumber}번에 '${gameState.name}'(으)로 성공적으로 저장되었습니다!`);
+        localStorage.setItem(`ai_game_save_${slotNumber}`, JSON.stringify(saveState));
+        
+        // 🚀 저장 슬롯 상태를 즉시 업데이트
+        setSlots(prevSlots => prevSlots.map(slot => 
+            slot.id === slotNumber 
+                ? { ...slot, saved: true, name: saveState.name, savedAt: saveState.savedAt } 
+                : slot
+        ));
+
+        alert(`게임이 ${slotNumber}번에 '${saveState.name}'(으)로 성공적으로 저장되었습니다!`);
     } catch (e) {
         console.error("Failed to save game:", e);
         alert("게임 저장에 실패했습니다.");
@@ -358,16 +555,19 @@ function App() {
       try {
           const savedState = localStorage.getItem(`ai_game_save_${slotNumber}`);
           if (savedState) {
-              const gameState = JSON.parse(savedState);
-              setStory(gameState.story);
-              setHp(gameState.hp);
-              setAtk(gameState.atk);
-              setMp(gameState.mp);
-              setItems(gameState.items);
-              setSurvivalTurns(gameState.survivalTurns);
-              setSceneImageUrl(gameState.sceneImageUrl);
-              setIsGameOver(false);
-              setSaveName(gameState.name || ""); // 불러온 이름으로 입력 필드 업데이트
+              const loadedGameState = JSON.parse(savedState);
+              setGameState(prev => ({
+                ...prev,
+                story: loadedGameState.story,
+                hp: loadedGameState.hp,
+                atk: loadedGameState.atk,
+                mp: loadedGameState.mp,
+                items: loadedGameState.items,
+                survivalTurns: loadedGameState.survivalTurns,
+                sceneImageUrl: loadedGameState.sceneImageUrl,
+                isGameOver: false, // 불러오기 시 게임 오버 상태를 초기화
+              }));
+              setSaveName(loadedGameState.name || ""); // 불러온 이름으로 입력 필드 업데이트
               alert(`${slotNumber}번의 게임을 불러왔습니다!`);
           } else {
               alert(`${slotNumber}번에 저장된 게임이 없습니다.`);
@@ -400,7 +600,7 @@ function App() {
         <div className="flex items-center justify-between">
           <h1 className="text-4xl font-extrabold text-purple-700">AI Text Adventure Game</h1>
           <div className="flex items-center gap-3">
-            {isTextLoading && <Spinner label="응답 생성 중…" />}
+            {gameState.isTextLoading && <Spinner label="응답 생성 중…" />}
             <button onClick={() => setShowOptions(true)} className="text-sm bg-gray-800 hover:bg-black text-white px-3 py-1.5 rounded-lg">
               옵션
             </button>
@@ -413,37 +613,37 @@ function App() {
           <div className="bg-gray-50 border border-gray-200 rounded-xl p-4">
             <h2 className="font-bold text-gray-700 mb-3">현재 상태</h2>
             <div className="space-y-2">
-              <div className="flex justify-between">
+              <div className={`flex justify-between p-1 rounded-md transition-colors duration-500 border-b border-gray-200 pb-2 mb-2 ${gameState.lastDelta.hp > 0 ? "bg-green-100" : gameState.lastDelta.hp < 0 ? "bg-red-100" : ""}`}>
                 <span>체력(HP)</span>
-                <span className="font-semibold flex items-center">
-                  {hp}
-                  <DeltaBadge value={lastDelta.hp} />
+                <span className="font-semibold flex items-center justify-end w-20">
+                  {gameState.hp}
+                  <DeltaBadge value={gameState.lastDelta.hp} />
                 </span>
               </div>
-              <div className="flex justify-between">
+              <div className={`flex justify-between p-1 rounded-md transition-colors duration-500 border-b border-gray-200 pb-2 mb-2 ${gameState.lastDelta.atk > 0 ? "bg-green-100" : gameState.lastDelta.atk < 0 ? "bg-red-100" : ""}`}>
                 <span>공격력(ATK)</span>
-                <span className="font-semibold flex items-center">
-                  {atk}
-                  <DeltaBadge value={lastDelta.atk} />
+                <span className="font-semibold flex items-center justify-end w-20">
+                  {gameState.atk}
+                  <DeltaBadge value={gameState.lastDelta.atk} />
                 </span>
               </div>
-              <div className="flex justify-between">
+              <div className={`flex justify-between p-1 rounded-md transition-colors duration-500 border-b border-gray-200 pb-2 mb-2 ${gameState.lastDelta.mp > 0 ? "bg-green-100" : gameState.lastDelta.mp < 0 ? "bg-red-100" : ""}`}>
                 <span>마력(MP)</span>
-                <span className="font-semibold flex items-center">
-                  {mp}
-                  <DeltaBadge value={lastDelta.mp} />
+                <span className="font-semibold flex items-center justify-end w-20">
+                  {gameState.mp}
+                  <DeltaBadge value={gameState.lastDelta.mp} />
                 </span>
               </div>
 
-              <div className="flex justify-between">
+              <div className={`flex justify-between p-1 rounded-md transition-colors duration-500 border-b border-gray-200 pb-2 mb-2 ${gameState.lastSurvivalTurn ? "bg-purple-100" : ""}`}>
                 <span>생존 턴</span>
-                <span className="font-semibold">{survivalTurns}</span>
+                <span className="font-semibold">{gameState.survivalTurns}</span>
               </div>
 
               <div>
                 <div className="mb-1">소지품</div>
                 <div className="flex flex-wrap gap-2">
-                  {items.map((it, i) => (
+                  {gameState.items.map((it, i) => (
                     <span key={i} className="px-2 py-1 text-sm rounded-lg bg-purple-100 text-purple-700 border border-purple-200">
                       {it}
                     </span>
@@ -451,11 +651,11 @@ function App() {
                 </div>
               </div>
 
-              {!!hudNotes.length && (
+              {!!gameState.hudNotes.length && (
                 <div className="mt-3">
                   <div className="text-sm font-semibold text-gray-700 mb-1">최근 변화</div>
                   <ul className="list-disc list-inside text-sm text-gray-700 space-y-0.5">
-                    {hudNotes.map((n, i) => (
+                    {gameState.hudNotes.map((n, i) => (
                       <li key={i}>{n}</li>
                     ))}
                   </ul>
@@ -467,20 +667,20 @@ function App() {
           {/* 이미지 카드 */}
           <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 flex flex-col">
             <div className="aspect-video w-full overflow-hidden rounded-lg bg-gray-200 flex items-center justify-center border border-gray-300 relative">
-              {sceneImageUrl ? (
-                <img src={sceneImageUrl} alt="scene" className="w-full h-full object-cover" />
+              {gameState.sceneImageUrl ? (
+                <img src={gameState.sceneImageUrl} alt="scene" className="w-full h-full object-cover" />
               ) : (
                 <span className="text-gray-500 text-sm">
                   {withImage ? "아직 생성된 그림이 없습니다." : "이미지 생성을 꺼 두었습니다. (옵션에서 변경)"}
                 </span>
               )}
-              {isImgLoading && (
+              {gameState.isImgLoading && (
                 <div className="absolute inset-0 bg-black/20 flex items-center justify-center">
                   <Spinner label="이미지 생성 중…" />
                 </div>
               )}
             </div>
-            {imgError && <div className="text-sm text-red-600 mt-2">{imgError}</div>}
+            {gameState.imgError && <div className="text-sm text-red-600 mt-2">{gameState.imgError}</div>}
           </div>
         </div>
 
@@ -488,38 +688,70 @@ function App() {
         <div className="flex justify-center gap-4">
           <button
             onClick={generateScenario}
-            disabled={isTextLoading || isGameOver}
+            disabled={gameState.isTextLoading || gameState.isGameOver}
             className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-6 rounded-xl transition duration-300 disabled:opacity-50"
           >
-            {isTextLoading ? "로딩 중..." : "새로운 상황 생성"}
+            {gameState.isTextLoading ? "로딩 중..." : "새로운 상황 생성"}
           </button>
         </div>
 
         {/* 📝 시나리오 출력 */}
-        {story && <div className="bg-gray-100 border border-gray-300 rounded-xl p-4 text-lg whitespace-pre-wrap shadow-inner">{story}</div>}
+        {gameState.story && (
+            <div 
+                ref={storyRef}
+                className="bg-gray-100 border border-gray-300 rounded-xl p-4 text-lg whitespace-pre-wrap shadow-inner overflow-y-auto max-h-[400px]"
+            >
+                {gameState.typingStory}
+            </div>
+        )}
 
         {/* 🎯 유저 입력창 및 버튼 */}
-        {story && !isGameOver && (
-          <div className="flex flex-col space-y-3">
+        {gameState.story && !gameState.isGameOver && (
+          <form 
+            onSubmit={(e) => {
+              e.preventDefault(); // 페이지 새로고침 방지
+              submitAction();
+            }}
+            className="flex flex-col space-y-3"
+          >
             <input
               type="text"
-              value={userAction}
-              onChange={(e) => setUserAction(e.target.value)}
+              value={gameState.userAction}
+              onChange={(e) => setGameState(prev => ({ ...prev, userAction: e.target.value }))}
               placeholder="당신의 행동을 입력하세요..."
+              disabled={!gameState.isTypingFinished || gameState.isTextLoading}
               className="p-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-400"
             />
+
+            {/* 🚀 추천 행동 버튼 */}
+            {/* ⭐️ 타이핑이 끝나야 버튼이 보이도록 조건을 추가합니다. */}
+            {gameState.recommendedAction && gameState.isTypingFinished && (
             <button
-              onClick={submitAction}
-              disabled={isTextLoading || !userAction}
+                type="button" // form submit 방지
+                onClick={() => {
+                setGameState(prev => ({ ...prev, userAction: prev.recommendedAction }));
+                // Note: form의 onSubmit이 자동으로 실행되지 않으므로,
+                // userAction 상태를 업데이트 한 후 submitAction을 직접 호출합니다.
+                submitAction();
+                }}
+                className="bg-purple-500 hover:bg-purple-600 text-white font-semibold py-2 px-5 rounded-xl transition duration-300 disabled:opacity-50"
+            >
+                {gameState.recommendedAction} (추천 행동)
+            </button>
+            )}
+
+            <button
+              type="submit"
+              disabled={!gameState.isTypingFinished || gameState.isTextLoading || !gameState.userAction}
               className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-5 rounded-xl transition duration-300 disabled:opacity-50"
             >
-              {isTextLoading ? "로딩 중..." : "다음 이야기 진행"}
+              {gameState.isTextLoading ? "로딩 중..." : "다음 이야기 진행"}
             </button>
-          </div>
+          </form>
         )}
 
         {/* 🏠 홈으로 가는 버튼 / 게임오버 */}
-        {isGameOver && (
+        {gameState.isGameOver && (
           <div className="flex flex-col items-center gap-3">
             <div className="text-red-600 font-bold">체력이 0이 되어 게임 오버!</div>
             <button onClick={goHome} className="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-6 rounded-xl transition">
