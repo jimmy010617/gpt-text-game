@@ -36,6 +36,11 @@ function App() {
   const [lastDelta, setLastDelta] = useState({ hp: 0, atk: 0, mp: 0 });
   const [hudNotes, setHudNotes] = useState([]); // ["괴물과 싸워 ATK +1", "피해를 받아 HP -10" ... 최대 n개 유지)
 
+  // 💾 저장/불러오기 관련 상태
+  const [currentSlot, setCurrentSlot] = useState(1);
+  const [slots, setSlots] = useState([]);
+  const [saveName, setSaveName] = useState("");
+
   // ➕ 마지막 옵션 기억
   useEffect(() => {
     const saved = localStorage.getItem("withImage");
@@ -44,6 +49,23 @@ function App() {
   useEffect(() => {
     localStorage.setItem("withImage", String(withImage));
   }, [withImage]);
+
+  // 앱 시작 시 저장된 슬롯을 확인하는 useEffect
+  useEffect(() => {
+    const slotsData = [];
+    for (let i = 1; i <= 3; i++) {
+        const key = `ai_game_save_${i}`;
+        const savedData = localStorage.getItem(key);
+        if (savedData) {
+            const data = JSON.parse(savedData);
+            slotsData.push({ id: i, saved: true, name: data.name, savedAt: data.savedAt });
+        } else {
+            slotsData.push({ id: i, saved: false });
+        }
+    }
+    setSlots(slotsData);
+  }, []);
+
 
   // 🔌 Gemini SDK
   const ai = useMemo(() => (GEMINI_API_KEY ? new GoogleGenAI({ apiKey: GEMINI_API_KEY }) : null), []);
@@ -309,6 +331,68 @@ function App() {
     );
   };
 
+  // 💾 게임 상태 저장 함수
+  const saveGame = (slotNumber, saveName) => { // ⬅️ 매개변수를 saveName으로 변경
+    const gameState = {
+        story,
+        hp,
+        atk,
+        mp,
+        items,
+        survivalTurns,
+        sceneImageUrl,
+        name: saveName || `저장 #${slotNumber}`, // ⬅️ saveName을 할당
+        savedAt: new Date().toLocaleString(),
+    };
+    try {
+        localStorage.setItem(`ai_game_save_${slotNumber}`, JSON.stringify(gameState));
+        alert(`게임이 ${slotNumber}번에 '${gameState.name}'(으)로 성공적으로 저장되었습니다!`);
+    } catch (e) {
+        console.error("Failed to save game:", e);
+        alert("게임 저장에 실패했습니다.");
+    }
+  };
+
+  // 📂 게임 상태 불러오기 함수
+  const loadGame = (slotNumber) => {
+      try {
+          const savedState = localStorage.getItem(`ai_game_save_${slotNumber}`);
+          if (savedState) {
+              const gameState = JSON.parse(savedState);
+              setStory(gameState.story);
+              setHp(gameState.hp);
+              setAtk(gameState.atk);
+              setMp(gameState.mp);
+              setItems(gameState.items);
+              setSurvivalTurns(gameState.survivalTurns);
+              setSceneImageUrl(gameState.sceneImageUrl);
+              setIsGameOver(false);
+              setSaveName(gameState.name || ""); // 불러온 이름으로 입력 필드 업데이트
+              alert(`${slotNumber}번의 게임을 불러왔습니다!`);
+          } else {
+              alert(`${slotNumber}번에 저장된 게임이 없습니다.`);
+          }
+      } catch (e) {
+          console.error("Failed to load game:", e);
+          alert("게임 불러오기에 실패했습니다.");
+      }
+  };
+
+  // 🗑 게임 상태 삭제 함수
+  const deleteGame = (slotNumber) => {
+      try {
+          localStorage.removeItem(`ai_game_save_${slotNumber}`);
+          // 삭제 후 슬롯 상태를 즉시 업데이트
+          setSlots(prevSlots => prevSlots.map(slot => 
+              slot.id === slotNumber ? { ...slot, saved: false } : slot
+          ));
+          alert(`${slotNumber}번의 게임이 삭제되었습니다.`);
+      } catch (e) {
+          console.error("Failed to delete game from localStorage:", e);
+          alert("게임 삭제에 실패했습니다.");
+      }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-indigo-100 to-purple-200 p-6 flex flex-col items-center justify-center">
       <div className="bg-white shadow-2xl rounded-2xl w-full max-w-4xl p-8 space-y-6 border border-gray-200">
@@ -401,7 +485,7 @@ function App() {
         </div>
 
         {/* 🎲 상황 생성 버튼 */}
-        <div className="flex justify-center">
+        <div className="flex justify-center gap-4">
           <button
             onClick={generateScenario}
             disabled={isTextLoading || isGameOver}
@@ -445,33 +529,130 @@ function App() {
         )}
       </div>
 
-      {/* ✅ 옵션 팝업(모달) */}
       {showOptions && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div className="absolute inset-0 bg-black/40" onClick={() => setShowOptions(false)} aria-hidden="true" />
-          <div className="relative bg-white w-full max-w-md mx-4 rounded-2xl shadow-xl border border-gray-200 p-6">
-            <h3 className="text-xl font-bold text-gray-800 mb-4">생성 옵션</h3>
+            <div className="absolute inset-0 bg-black/40" onClick={() => setShowOptions(false)} aria-hidden="true" />
+              <div className="relative bg-white w-full max-w-md mx-4 rounded-2xl shadow-xl border border-gray-200 p-8">
+                
+                <h2 className="text-3xl font-extrabold text-purple-700 text-center mb-6">설정</h2>
 
-            <label className="flex items-start gap-3 select-none">
-              <input type="checkbox" className="mt-1 w-4 h-4" checked={withImage} onChange={(e) => setWithImage(e.target.checked)} />
-              <span className="text-gray-700">
-                <span className="font-semibold">스토리와 함께 이미지도 생성</span>
-                <span className="block text-sm text-gray-500">꺼두면 과금/속도를 아낄 수 있고, 스토리만 빠르게 생성합니다.</span>
-              </span>
-            </label>
+                {/* ✅ 생성 옵션 섹션 */}
+                <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-6">
+                    <h3 className="font-bold text-gray-700 mb-3">스토리 생성 설정</h3>
+                    <label className="flex items-center gap-3 select-none">
+                        <input type="checkbox" className="mt-1 w-4 h-4 text-purple-600 focus:ring-purple-500" checked={withImage} onChange={(e) => setWithImage(e.target.checked)} />
+                        <span className="text-gray-700">
+                            <span className="font-semibold block">스토리와 함께 이미지도 생성</span>
+                            <span className="block text-sm text-gray-500">
+                                이미지 생성 비용이 발생할 수 있습니다.
+                            </span>
+                        </span>
+                    </label>
+                </div>
 
-            <div className="mt-6 flex justify-end gap-2">
-              <button onClick={() => setShowOptions(false)} className="px-4 py-2 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-800">
-                닫기
-              </button>
-              <button
-                onClick={() => setShowOptions(false)}
-                className="px-4 py-2 rounded-lg bg-purple-600 hover:bg-purple-700 text-white font-semibold"
-              >
-                적용
-              </button>
+                {/* 💾 저장/불러오기 섹션 */}
+                <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                    <h3 className="font-bold text-gray-700 mb-3">게임 저장/불러오기</h3>
+                    
+                    <div className="mb-4">
+                        <p className="font-semibold text-sm text-gray-600 mb-2">저장 슬롯 선택:</p>
+                        <div className="grid grid-cols-3 gap-2">
+                          {slots.map(slot => {
+                              // 이름을 10글자로 자르고, 초과하면 "..."을 추가합니다.
+                              const displayName = slot.saved && slot.name 
+                                                  ? (slot.name.length > 10 ? slot.name.substring(0, 10) + '...' : slot.name)
+                                                  : '비어있음 ❌';
+                              
+                              return (
+                                  <button
+                                      key={slot.id}
+                                      onClick={() => {
+                                          setCurrentSlot(slot.id);
+                                          setSaveName(slot.name || ""); // 슬롯 선택 시 저장 이름 필드 업데이트
+                                      }}
+                                      className={`w-full px-2 py-3 rounded-lg font-semibold transition ${
+                                          currentSlot === slot.id
+                                              ? 'bg-purple-600 text-white shadow-md'
+                                              : 'bg-gray-200 text-gray-800 hover:bg-gray-300'
+                                      }`}
+                                  >
+                                      {slot.id}번<br />
+                                      <span className="text-xs font-bold block mt-1">
+                                          {displayName}
+                                      </span>
+                                      {slot.saved && (
+                                          <span className="text-xs font-normal block opacity-70 mt-1">
+                                              {slot.savedAt}
+                                          </span>
+                                      )}
+                                  </button>
+                              );
+                          })}
+                      </div>
+                    </div>
+
+                    {/* 💾 저장 이름 입력 필드 */}
+                      <div className="mb-4">
+                        <label htmlFor="saveName" className="font-semibold text-sm text-gray-600 mb-2 block">저장 이름 (선택 사항):</label>
+                        <input
+                            id="saveName"
+                            type="text"
+                            value={saveName}
+                            onChange={(e) => setSaveName(e.target.value)}
+                            placeholder="이름이나 설명을 입력하세요"
+                            className="w-full p-2 border border-gray-300 rounded-lg text-sm"
+                        />
+                      </div>
+
+                    <div className="flex justify-between gap-2">
+                        <button
+                          onClick={() => {
+                              // 슬롯이 이미 저장되어 있으면 경고창 표시
+                              const isSlotSaved = slots.find(s => s.id === currentSlot)?.saved;
+                              if (isSlotSaved && !window.confirm(`${currentSlot}번에 이미 저장된 게임이 있습니다. 덮어쓰시겠습니까?`)) {
+                                  return; // 사용자가 '취소'를 누르면 함수 종료
+                              }
+                              
+                              saveGame(currentSlot, saveName);
+                              setShowOptions(false); // 저장 후 모달 닫기
+                          }}
+                          className="flex-1 px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold transition"
+                        >
+                            저장
+                        </button>
+                        <button
+                          onClick={() => {
+                              loadGame(currentSlot);
+                              setShowOptions(false); // 불러오기 후 모달 닫기
+                          }}
+                          disabled={!slots.find(s => s.id === currentSlot)?.saved}
+                          className="flex-1 px-4 py-2 rounded-lg bg-green-600 hover:bg-green-700 text-white font-semibold transition disabled:opacity-50"
+                        >
+                            불러오기
+                        </button>
+                        <button
+                          onClick={() => {
+                              if (window.confirm(`${currentSlot}번의 게임을 정말 삭제하시겠습니까?`)) {
+                                  deleteGame(currentSlot);
+                              }
+                          }}
+                          disabled={!slots.find(s => s.id === currentSlot)?.saved}
+                          className="flex-1 px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white font-semibold transition disabled:opacity-50"
+                        >
+                          삭제
+                      </button>
+                    </div>
+                </div>
+
+                <div className="mt-6 flex justify-center">
+                    <button
+                        onClick={() => setShowOptions(false)}
+                        className="w-full py-2 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-800 font-semibold"
+                    >
+                        닫기
+                    </button>
+                </div>
             </div>
-          </div>
         </div>
       )}
     </div>
