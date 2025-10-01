@@ -38,6 +38,131 @@ type Item = {
   defBonus?: number; // 방어구 방어력 보너스 (현재 미사용, 향후 확장용)
 };
 
+// ===== 장르 타입 & 목록 =====
+type GenreMode = "fixed" | "random-run" | "rotate-turn";
+type Genre = {
+  id: string;
+  label: string; // UI 표시명 (ko)
+  systemStyle: string; // 서술 톤/분위기 지시
+  promptSeed: string; // 장르 키워드/상황 시드
+};
+
+// ⚠️ 장르는 언제든 추가/수정 가능
+const GENRES: Genre[] = [
+  {
+    id: "modern-disaster",
+    label: "현대 재난 생존",
+    systemStyle: "긴박하고 현실적인 톤, 실제 시민 생존 감정선 강조",
+    promptSeed: "도심 정전, 지하철 고립, 제한된 식수와 전력",
+  },
+  {
+    id: "apocalypse",
+    label: "포스트 아포칼립스",
+    systemStyle: "황량하고 거친 톤, 자원 희소/도덕적 딜레마",
+    promptSeed: "폐허 도시, 약탈자, 방사능 구역, 자작 무기",
+  },
+  {
+    id: "zombie",
+    label: "좀비 아웃브레이크",
+    systemStyle: "긴장/스텔스, 소음 관리, 감염 공포",
+    promptSeed: "소리 유인, 안전가옥, 방호복, 해독제 소문",
+  },
+  {
+    id: "desert",
+    label: "사막 횡단 생존",
+    systemStyle: "건조/극한 환경, 체력/수분 관리 강조",
+    promptSeed: "오아시스 수색, 모래폭풍, 별자리로 방향 잡기",
+  },
+  {
+    id: "island",
+    label: "무인도 생존",
+    systemStyle: "자급자족, 제작/사냥/채집 루프",
+    promptSeed: "익사된 난파선, 구조 신호, 코코넛/어류/장작",
+  },
+  {
+    id: "snow",
+    label: "설원/빙하지대",
+    systemStyle: "저체온/바람/시야 제한, 화기/텐트 관리",
+    promptSeed: "눈보라, 얼음 크레바스, 흰out, 발자국 추적",
+  },
+  {
+    id: "cave",
+    label: "동굴 탐험 생존",
+    systemStyle: "폐쇄공포/탐사, 로프/랜턴/산소 관리",
+    promptSeed: "지하 강, 좁은 크랙, 표식 남기기, 박쥐",
+  },
+  {
+    id: "sea-drift",
+    label: "해양 표류",
+    systemStyle: "염분/탈수/햇빛, 즉흥적인 담수화/낚시",
+    promptSeed: "구명보트, 비상식량, 비 올때 수집, 상어",
+  },
+  {
+    id: "space-station",
+    label: "우주정거장 생존",
+    systemStyle: "하드SF, 산소/전력/모듈 수리, 무중력",
+    promptSeed: "누설 위치 탐색, 태양 플레어, 외벽 EVA",
+  },
+  {
+    id: "cyberpunk",
+    label: "사이버펑크 슬럼",
+    systemStyle: "디스토피아/해킹/암시장, 네온 느와르",
+    promptSeed: "의체 과부하, 데이터칩, 갱단 체인소우",
+  },
+  {
+    id: "stealth",
+    label: "스텔스 생존",
+    systemStyle: "은신/도주 중심, 소리/시야/경로 설계",
+    promptSeed: "수색대, 드론 회피, 통신 교란, 배수로",
+  },
+  {
+    id: "space-sf",
+    label: "우주SF 탐사 생존",
+    systemStyle: "이국적 바이옴, 과학적 해결, 도구 제작",
+    promptSeed: "외계 식물 샘플, 방사선 폭풍, 탐사 로버",
+  },
+];
+
+// 헬퍼
+const getGenreById = (id?: string | null) => GENRES.find((g) => g.id === id) || null;
+const pickRandomGenre = () => GENRES[Math.floor(Math.random() * GENRES.length)];
+
+function buildGenreDirectivesForPrompt(
+  mode: GenreMode,
+  selectedId: string | null | undefined,
+  turnInRun: number
+): { activeGenre: Genre | null; genreText: string } {
+  // 모드별 현재 턴에 쓸 장르 결정
+  let active: Genre | null = null;
+
+  if (mode === "fixed") {
+    active = getGenreById(selectedId) || null;
+  } else if (mode === "random-run") {
+    // 한 판 시작 시 고정되도록: selectedId 가 null이라면 시작 시에만 랜덤으로 확정
+    active = getGenreById(selectedId) || null;
+  } else if (mode === "rotate-turn") {
+    // 기준 시작 장르가 있다면 그 다음부터 순환. 없으면 0부터
+    const baseIdx = selectedId
+      ? Math.max(
+          0,
+          GENRES.findIndex((g) => g.id === selectedId)
+        )
+      : 0;
+    const idx = (baseIdx + Math.max(0, turnInRun)) % GENRES.length;
+    active = GENRES[idx];
+  }
+
+  // 장르 지시 텍스트
+  const genreText = active
+    ? `장르 지시: '${active.label}' 느낌을 중심으로 전개하되, 클리셰를 피하고 ${active.systemStyle}.\n` +
+      `장르 키워드: ${active.promptSeed}\n`
+    : // 선택 장르 없음 → 어떤 장르든 가능하게, 한쪽으로 쏠리지 않도록 지시
+      `장르 지시: 특정 장르에 고정하지 말고(현실/판타지/SF/근미래/재난/스텔스 등) 매 턴 신선한 생존 상황을 설계. ` +
+      `이전 턴과 분위기가 너무 반복되지 않도록 변주를 주고, 스탯에 따라 해결 방식이 다르게 전개.`;
+
+  return { activeGenre: active, genreText };
+}
+
 type GameState = {
   story: string;
   typingStory: string;
@@ -59,6 +184,10 @@ type GameState = {
   hudNotes: string[];
   recommendedAction: string;
   isTypingFinished: boolean;
+
+  selectedGenreId?: string | null; // 사용자가 고른 장르 (없으면 null)
+  genreMode: GenreMode; // "fixed" | "random-run" | "rotate-turn"
+  turnInRun: number;
 };
 
 type AskResult = {
@@ -74,13 +203,28 @@ type AskResult = {
 // ===== 유틸: 아이템 종류 분류 (하드코딩된 목록) =====
 const categorizeItem = (name: string): ItemType => {
   const normalizedName = name.trim().toLowerCase();
-  if (normalizedName.includes("검") || normalizedName.includes("도끼") || normalizedName.includes("활") || normalizedName.includes("지팡이")) {
+  if (
+    normalizedName.includes("검") ||
+    normalizedName.includes("도끼") ||
+    normalizedName.includes("활") ||
+    normalizedName.includes("지팡이")
+  ) {
     return "weapon";
   }
-  if (normalizedName.includes("빵") || normalizedName.includes("고기") || normalizedName.includes("약초") || normalizedName.includes("사과")) {
+  if (
+    normalizedName.includes("빵") ||
+    normalizedName.includes("고기") ||
+    normalizedName.includes("약초") ||
+    normalizedName.includes("사과")
+  ) {
     return "food";
   }
-  if (normalizedName.includes("갑옷") || normalizedName.includes("방패") || normalizedName.includes("투구") || normalizedName.includes("갑주")) {
+  if (
+    normalizedName.includes("갑옷") ||
+    normalizedName.includes("방패") ||
+    normalizedName.includes("투구") ||
+    normalizedName.includes("갑주")
+  ) {
     return "armor";
   }
   if (normalizedName.includes("포션") || normalizedName.includes("물약") || normalizedName.includes("회복제")) {
@@ -109,8 +253,8 @@ const DEFAULT_INITIAL_STATE: GameState = {
   equippedWeapon: null, // 💡 초기 상태에 장착된 무기/방어구 추가
   equippedArmor: null,
   items: [
-    { name: "허름한 검", quantity: 1, type: "weapon", atkBonus: 5 }, 
-    { name: "빵 한 조각", quantity: 1, type: "food" }
+    { name: "허름한 검", quantity: 1, type: "weapon", atkBonus: 5 },
+    { name: "빵 한 조각", quantity: 1, type: "food" },
   ],
   survivalTurns: 0,
   sceneImageUrl: "",
@@ -120,6 +264,9 @@ const DEFAULT_INITIAL_STATE: GameState = {
   hudNotes: [],
   recommendedAction: "",
   isTypingFinished: false,
+  selectedGenreId: null,
+  genreMode: "random-run",
+  turnInRun: 0,
 };
 
 // ===== 유틸: 초기 상태 불러오기 =====
@@ -156,8 +303,10 @@ const loadInitialState = (): GameState => {
         hudNotes: loadedState.hudNotes ?? [],
         recommendedAction: loadedState.recommendedAction ?? "", // 💡 recommendedAction 상태 불러오기
         isTypingFinished: true, // 💡 저장된 스토리가 있으면 타이핑이 끝난 상태로 시작
+        selectedGenreId: loadedState.selectedGenreId ?? null,
+        genreMode: (loadedState.genreMode as GenreMode) ?? "fixed",
+        turnInRun: loadedState.turnInRun ?? 0,
       };
-
     }
   } catch (e) {
     console.error("자동 저장된 게임 불러오기 실패:", e);
@@ -182,7 +331,18 @@ function App() {
   const [slots, setSlots] = useState<Array<{ id: number; saved: boolean; name?: string; savedAt?: string }>>([]);
   const [saveName, setSaveName] = useState<string>("");
   const [newItemName, setNewItemName] = useState<string>("");
-  
+  // 장르 설정 상태
+  const [genreModeUI, setGenreModeUI] = useState<GenreMode>(gameState.genreMode);
+  const [selectedGenreIdUI, setSelectedGenreIdUI] = useState<string | null>(gameState.selectedGenreId ?? null);
+
+  // 옵션 모달 열릴 때 UI상태를 현재값으로 동기화
+  useEffect(() => {
+    if (showOptions) {
+      setGenreModeUI(gameState.genreMode);
+      setSelectedGenreIdUI(gameState.selectedGenreId ?? null);
+    }
+  }, [showOptions]);
+
   // 💡 장착된 무기에 따라 ATK 계산하는 유틸 함수
   const getAdjustedAtk = useCallback(() => {
     return gameState.atk + (gameState.equippedWeapon?.atkBonus || 0);
@@ -198,7 +358,7 @@ function App() {
       let newItems = [...prev.items];
       let newHudNotes = [...prev.hudNotes];
       const itemIndex = newItems.findIndex((item) => item.name === itemToUse.name);
-  
+
       if (itemIndex > -1) {
         if (itemToUse.type === "food") {
           newHp = prev.hp + 10;
@@ -224,81 +384,81 @@ function App() {
       };
     });
   }, []);
-  
+
   // 💡 장착 핸들러
   const handleEquipItem = useCallback((itemToEquip: Item) => {
-      if (itemToEquip.type !== "weapon" && itemToEquip.type !== "armor") {
-        alert("장착할 수 없는 아이템입니다.");
-        return;
+    if (itemToEquip.type !== "weapon" && itemToEquip.type !== "armor") {
+      alert("장착할 수 없는 아이템입니다.");
+      return;
+    }
+
+    setGameState((prev) => {
+      let newItems = [...prev.items];
+      let newEquippedWeapon = prev.equippedWeapon;
+      let newEquippedArmor = prev.equippedArmor;
+      let newHudNotes = [...prev.hudNotes];
+
+      // 소지품 목록에서 아이템 제거
+      const itemIndex = newItems.findIndex((item) => item.name === itemToEquip.name);
+      if (itemIndex === -1) return prev;
+      newItems.splice(itemIndex, 1);
+
+      if (itemToEquip.type === "weapon") {
+        if (newEquippedWeapon) {
+          // 기존 무기 해제 후 인벤토리로 이동
+          newItems.push(newEquippedWeapon);
+          newHudNotes = [`무기 해제: ${newEquippedWeapon.name}`, ...newHudNotes].slice(0, 6);
+        }
+        newEquippedWeapon = itemToEquip;
+        newHudNotes = [`무기 장착: ${itemToEquip.name}`, ...newHudNotes].slice(0, 6);
+      } else if (itemToEquip.type === "armor") {
+        if (newEquippedArmor) {
+          // 기존 방어구 해제 후 인벤토리로 이동
+          newItems.push(newEquippedArmor);
+          newHudNotes = [`방어구 해제: ${newEquippedArmor.name}`, ...newHudNotes].slice(0, 6);
+        }
+        newEquippedArmor = itemToEquip;
+        newHudNotes = [`방어구 장착: ${itemToEquip.name}`, ...newHudNotes].slice(0, 6);
       }
 
-      setGameState((prev) => {
-          let newItems = [...prev.items];
-          let newEquippedWeapon = prev.equippedWeapon;
-          let newEquippedArmor = prev.equippedArmor;
-          let newHudNotes = [...prev.hudNotes];
-
-          // 소지품 목록에서 아이템 제거
-          const itemIndex = newItems.findIndex((item) => item.name === itemToEquip.name);
-          if (itemIndex === -1) return prev;
-          newItems.splice(itemIndex, 1);
-
-          if (itemToEquip.type === "weapon") {
-              if (newEquippedWeapon) {
-                  // 기존 무기 해제 후 인벤토리로 이동
-                  newItems.push(newEquippedWeapon);
-                  newHudNotes = [`무기 해제: ${newEquippedWeapon.name}`, ...newHudNotes].slice(0, 6);
-              }
-              newEquippedWeapon = itemToEquip;
-              newHudNotes = [`무기 장착: ${itemToEquip.name}`, ...newHudNotes].slice(0, 6);
-          } else if (itemToEquip.type === "armor") {
-              if (newEquippedArmor) {
-                  // 기존 방어구 해제 후 인벤토리로 이동
-                  newItems.push(newEquippedArmor);
-                  newHudNotes = [`방어구 해제: ${newEquippedArmor.name}`, ...newHudNotes].slice(0, 6);
-              }
-              newEquippedArmor = itemToEquip;
-              newHudNotes = [`방어구 장착: ${itemToEquip.name}`, ...newHudNotes].slice(0, 6);
-          }
-
-          return {
-              ...prev,
-              items: newItems,
-              equippedWeapon: newEquippedWeapon,
-              equippedArmor: newEquippedArmor,
-              hudNotes: newHudNotes,
-          };
-      });
+      return {
+        ...prev,
+        items: newItems,
+        equippedWeapon: newEquippedWeapon,
+        equippedArmor: newEquippedArmor,
+        hudNotes: newHudNotes,
+      };
+    });
   }, []);
 
   // 💡 해제 핸들러
   const handleUnequipItem = useCallback((itemToUnequip: Item) => {
-      setGameState((prev) => {
-          let newItems = [...prev.items];
-          let newEquippedWeapon = prev.equippedWeapon;
-          let newEquippedArmor = prev.equippedArmor;
-          let newHudNotes = [...prev.hudNotes];
+    setGameState((prev) => {
+      let newItems = [...prev.items];
+      let newEquippedWeapon = prev.equippedWeapon;
+      let newEquippedArmor = prev.equippedArmor;
+      let newHudNotes = [...prev.hudNotes];
 
-          if (itemToUnequip.type === "weapon" && prev.equippedWeapon?.name === itemToUnequip.name) {
-              newItems.push(prev.equippedWeapon);
-              newEquippedWeapon = null;
-              newHudNotes = [`무기 해제: ${itemToUnequip.name}`, ...newHudNotes].slice(0, 6);
-          } else if (itemToUnequip.type === "armor" && prev.equippedArmor?.name === itemToUnequip.name) {
-              newItems.push(prev.equippedArmor);
-              newEquippedArmor = null;
-              newHudNotes = [`방어구 해제: ${itemToUnequip.name}`, ...newHudNotes].slice(0, 6);
-          } else {
-            return prev;
-          }
+      if (itemToUnequip.type === "weapon" && prev.equippedWeapon?.name === itemToUnequip.name) {
+        newItems.push(prev.equippedWeapon);
+        newEquippedWeapon = null;
+        newHudNotes = [`무기 해제: ${itemToUnequip.name}`, ...newHudNotes].slice(0, 6);
+      } else if (itemToUnequip.type === "armor" && prev.equippedArmor?.name === itemToUnequip.name) {
+        newItems.push(prev.equippedArmor);
+        newEquippedArmor = null;
+        newHudNotes = [`방어구 해제: ${itemToUnequip.name}`, ...newHudNotes].slice(0, 6);
+      } else {
+        return prev;
+      }
 
-          return {
-              ...prev,
-              items: newItems,
-              equippedWeapon: newEquippedWeapon,
-              equippedArmor: newEquippedArmor,
-              hudNotes: newHudNotes,
-          };
-      });
+      return {
+        ...prev,
+        items: newItems,
+        equippedWeapon: newEquippedWeapon,
+        equippedArmor: newEquippedArmor,
+        hudNotes: newHudNotes,
+      };
+    });
   }, []);
 
   useEffect(() => {
@@ -339,10 +499,40 @@ function App() {
     }
     setSlots(slotsData);
   }, []);
-
   const autoSaveGame = useCallback(() => {
-    const { story, hp, atk, mp, items, survivalTurns, sceneImageUrl, isGameOver, recommendedAction, equippedWeapon, equippedArmor } = gameState;
-    const autoSaveState = { story, hp, atk, mp, items, survivalTurns, sceneImageUrl, isGameOver, recommendedAction, equippedWeapon, equippedArmor };
+    const {
+      story,
+      hp,
+      atk,
+      mp,
+      items,
+      survivalTurns,
+      sceneImageUrl,
+      isGameOver,
+      recommendedAction,
+      equippedWeapon,
+      equippedArmor,
+      selectedGenreId,
+      genreMode,
+      turnInRun,
+    } = gameState;
+
+    const autoSaveState = {
+      story,
+      hp,
+      atk,
+      mp,
+      items,
+      survivalTurns,
+      sceneImageUrl,
+      isGameOver,
+      recommendedAction,
+      equippedWeapon,
+      equippedArmor,
+      selectedGenreId,
+      genreMode,
+      turnInRun,
+    };
     try {
       localStorage.setItem("ai_game_auto_save", JSON.stringify(autoSaveState));
       console.log("자동 저장 완료!");
@@ -432,7 +622,7 @@ function App() {
       "반드시 JSON만 출력. 포맷:\n" +
       "{\n" +
       '  "story": "한국어 스토리...",\n' +
-      '  "subject": { "ko": "버섯", "en": "a red mushroom" },\n' +
+      '  "subject": { "언어": "물체", "en": "subject" },\n' +
       '  "deltas": [ { "stat": "hp"|"atk"|"mp", "delta": -10, "reason": "적에게 맞음" }, ... ],\n' +
       '  "itemsAdd": ["아이템명"...],\n' +
       '  "itemsRemove": ["아이템명"...],\n' +
@@ -618,9 +808,12 @@ function App() {
       setGameState((prev) => ({ ...prev, isImgLoading: false }));
     }
   }
-
   const generateScenario = async () => {
     if (!ensureApi()) return;
+
+    // 한 판 시작: turnInRun = 0으로 초기화, random-run 모드는 시작 시 장르 확정
+    const nextSelected =
+      gameState.genreMode === "random-run" && !gameState.selectedGenreId ? pickRandomGenre().id : gameState.selectedGenreId ?? null;
 
     setGameState((prev) => ({
       ...prev,
@@ -636,26 +829,32 @@ function App() {
       hp: initialStats.hp,
       atk: initialStats.atk,
       mp: initialStats.mp,
-      equippedWeapon: null, // 💡 초기화 시 장착 아이템도 초기화
+      equippedWeapon: null,
       equippedArmor: null,
       items: [
-        { name: "허름한 검", quantity: 1, type: "weapon", atkBonus: 5 }, 
-        { name: "빵 한 조각", quantity: 1, type: "food" }
+        { name: "허름한 검", quantity: 1, type: "weapon", atkBonus: 5 },
+        { name: "빵 한 조각", quantity: 1, type: "food" },
       ],
       lastSurvivalTurn: "",
       recommendedAction: "",
       isTypingFinished: false,
+      turnInRun: 0,
+      selectedGenreId: nextSelected, // 한 판 랜덤이면 여기서 확정
     }));
 
+    const { genreText } = buildGenreDirectivesForPrompt(gameState.genreMode, nextSelected, 0);
+
     const chatPrompt =
-      "장르는 특정하지 말고(현실/판타지/SF 등 가능) 플레이어에게 흥미로운 상황을 한국어로 5~8문장으로 제시하세요. " +
-      "필요하면 선택지를 2~3개 제시하고, 마지막은 '행동을 입력하세요'로 끝내세요.";
+      `${genreText}\n` +
+      "장르는 특정하지 말고(가능하면 장르적 장치를 활용) 플레이어에게 흥미로운 '생존' 상황을 한국어로 5~8문장으로 제시. " +
+      "자원/위험/환경 제약을 분명히 제시하고, 선택지 2~3개를 만들어도 좋음. 마지막은 '행동을 입력하세요'로 끝낼 것.";
 
     try {
       const { nextStory, subject, deltas, itemsAdd, itemsRemove, recommendedAction } = await askStorySubjectAndDeltas({
         systemHint:
-          "story는 자연스러운 한국어 문단으로. subject는 단일 물체 1개만(가능하면 색/형태 한 단어 포함). " +
-          "deltas는 상황에 알맞게 hp/atk/mp를 정수로 증감. itemsAdd/Remove와 hudNotes도 필요시 채우기.",
+          "story는 자연스러운 한국어 문단. subject는 단일 물체 1개만. " +
+          "deltas는 hp/atk/mp를 정수 증감. itemsAdd/Remove도 필요시 채우기. " +
+          "같은 상황이라도 스탯에 따라 결과 분기.",
         userText: chatPrompt,
       });
 
@@ -683,22 +882,35 @@ function App() {
     if (!ensureApi() || !gameState.story || gameState.isGameOver) return;
     setGameState((prev) => ({ ...prev, isTextLoading: true }));
 
+    // 현재 러닝의 다음 턴 번호(프롬프트 위해 참조)
+    const nextTurn = gameState.turnInRun + 1;
+
+    const { genreText, activeGenre } = buildGenreDirectivesForPrompt(gameState.genreMode, gameState.selectedGenreId, nextTurn);
+
     const actionPrompt =
+      `${genreText}\n` +
       `이전 상황(컨텍스트):\n${gameState.story}\n\n` +
       `플레이어의 행동: ${gameState.userAction}\n\n` +
-      "게임 마스터처럼 자연스럽게 다음 전개를 서술하세요. 필요하면 선택지를 2~3개 제시하고, 마지막은 '행동을 입력하세요'로 끝내세요.";
+      "게임 마스터처럼 자연스럽게 다음 전개를 서술. 필요시 선택지 2~3개. '행동을 입력하세요'로 끝내기.";
 
     try {
       const { nextStory, subject, deltas, itemsAdd, itemsRemove, recommendedAction } = await askStorySubjectAndDeltas({
         systemHint:
-          "story는 한국어 문단으로. subject는 단일 물체 1개만(가능하면 색/형태 한 단어 포함). " +
-          "deltas는 상황에 맞춰 hp/atk/mp를 정수로 증감: 전투/피해/학습/회복/아이템 사용 등 반영. " +
-          "현재 스탯이 높거나 낮은 경우 결과가 달라지도록 설계. itemsAdd/Remove와 hudNotes도 필요시 채우기.",
+          "story는 한국어 문단. subject는 단일 물체 1개. " +
+          "deltas는 전투/피해/학습/회복/아이템 사용 등을 반영해 hp/atk/mp 정수 증감. " +
+          "스탯이 높거나 낮으면 결과가 달라지도록. itemsAdd/Remove도 필요시 채움.",
         userText: actionPrompt,
       });
 
       const out = nextStory || "이야기 생성 실패";
-      setGameState((prev) => ({ ...prev, story: out, userAction: "", recommendedAction: recommendedAction || "" }));
+      setGameState((prev) => ({
+        ...prev,
+        story: out,
+        userAction: "",
+        recommendedAction: recommendedAction || "",
+        // 순환 모드에서도 selectedGenreId는 그대로 두고, turnInRun만 증가
+        turnInRun: nextTurn,
+      }));
       applyDeltasAndItems({ deltas, itemsAdd, itemsRemove });
       autoSaveGame();
 
@@ -712,7 +924,6 @@ function App() {
       setGameState((prev) => ({ ...prev, isTextLoading: false }));
     }
   };
-
   const goHome = () => {
     if (window.confirm("정말 게임을 처음부터 다시 시작하시겠습니까? 모든 진행 상황이 초기화됩니다.")) {
       setGameState(DEFAULT_INITIAL_STATE);
@@ -847,53 +1058,73 @@ function App() {
               <h2 className="font-bold text-gray-700 mb-3">현재 상태</h2>
               {/* 스탯 관련 JSX */}
               {/* ... 기존 스탯 JSX 코드 ... */}
-              <div className={`flex justify-between p-1 rounded-md transition-colors duration-500 border-b border-gray-200 pb-2 mb-2 ${gameState.lastDelta.hp > 0 ? "bg-red-100" : gameState.lastDelta.hp < 0 ? "bg-red-100" : ""}`}>
-                  <span>체력(HP)</span>
-                  <span className="font-semibold flex items-center justify-end w-20">
-                      {gameState.hp}
-                      <DeltaBadge value={gameState.lastDelta.hp} />
-                  </span>
+              <div
+                className={`flex justify-between p-1 rounded-md transition-colors duration-500 border-b border-gray-200 pb-2 mb-2 ${
+                  gameState.lastDelta.hp > 0 ? "bg-red-100" : gameState.lastDelta.hp < 0 ? "bg-red-100" : ""
+                }`}
+              >
+                <span>체력(HP)</span>
+                <span className="font-semibold flex items-center justify-end w-20">
+                  {gameState.hp}
+                  <DeltaBadge value={gameState.lastDelta.hp} />
+                </span>
               </div>
-              <div className={`flex justify-between p-1 rounded-md transition-colors duration-500 border-b border-gray-200 pb-2 mb-2 ${gameState.lastDelta.atk > 0 ? "bg-orange-100" : gameState.lastDelta.atk < 0 ? "bg-orange-100" : ""}`}>
-                  <span>공격력(ATK)</span>
-                  <span className="font-semibold flex items-center justify-end w-20">
-                      {getAdjustedAtk()} {/* 💡 장착 무기 보너스 포함 */}
-                      <DeltaBadge value={gameState.lastDelta.atk} />
-                  </span>
+              <div
+                className={`flex justify-between p-1 rounded-md transition-colors duration-500 border-b border-gray-200 pb-2 mb-2 ${
+                  gameState.lastDelta.atk > 0 ? "bg-orange-100" : gameState.lastDelta.atk < 0 ? "bg-orange-100" : ""
+                }`}
+              >
+                <span>공격력(ATK)</span>
+                <span className="font-semibold flex items-center justify-end w-20">
+                  {getAdjustedAtk()} {/* 💡 장착 무기 보너스 포함 */}
+                  <DeltaBadge value={gameState.lastDelta.atk} />
+                </span>
               </div>
-              <div className={`flex justify-between p-1 rounded-md transition-colors duration-500 border-b border-gray-200 pb-2 mb-2 ${gameState.lastDelta.mp > 0 ? "bg-blue-100" : gameState.lastDelta.mp < 0 ? "bg-blue-100" : ""}`}>
-                  <span>마력(MP)</span>
-                  <span className="font-semibold flex items-center justify-end w-20">
-                      {gameState.mp}
-                      <DeltaBadge value={gameState.lastDelta.mp} />
-                  </span>
+              <div
+                className={`flex justify-between p-1 rounded-md transition-colors duration-500 border-b border-gray-200 pb-2 mb-2 ${
+                  gameState.lastDelta.mp > 0 ? "bg-blue-100" : gameState.lastDelta.mp < 0 ? "bg-blue-100" : ""
+                }`}
+              >
+                <span>마력(MP)</span>
+                <span className="font-semibold flex items-center justify-end w-20">
+                  {gameState.mp}
+                  <DeltaBadge value={gameState.lastDelta.mp} />
+                </span>
               </div>
-              <div className={`flex justify-between p-1 rounded-md transition-colors duration-500 border-b border-gray-200 pb-2 mb-2 ${gameState.lastSurvivalTurn ? "bg-purple-100" : ""}`}>
-                  <span>생존 턴</span>
-                  <span className="font-semibold">{gameState.survivalTurns}</span>
+              <div
+                className={`flex justify-between p-1 rounded-md transition-colors duration-500 border-b border-gray-200 pb-2 mb-2 ${
+                  gameState.lastSurvivalTurn ? "bg-purple-100" : ""
+                }`}
+              >
+                <span>생존 턴</span>
+                <span className="font-semibold">{gameState.survivalTurns}</span>
               </div>
               {!!gameState.hudNotes.length && (
-                  <div className="mt-3">
-                      <div className="text-sm font-semibold text-gray-700 mb-1">최근 변화</div>
-                      <ul className="list-disc list-inside text-sm text-gray-700 space-y-0.5">
-                          {gameState.hudNotes.map((n, i) => (<li key={i}>{n}</li>))}
-                      </ul>
-                  </div>
+                <div className="mt-3">
+                  <div className="text-sm font-semibold text-gray-700 mb-1">최근 변화</div>
+                  <ul className="list-disc list-inside text-sm text-gray-700 space-y-0.5">
+                    {gameState.hudNotes.map((n, i) => (
+                      <li key={i}>{n}</li>
+                    ))}
+                  </ul>
+                </div>
               )}
             </div>
             {/* 기존 이미지 영역 */}
             <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 flex flex-col">
               <div className="aspect-video w-full overflow-hidden rounded-lg bg-gray-200 flex items-center justify-center border border-gray-300 relative">
-                  {gameState.sceneImageUrl ? (
-                      <img src={gameState.sceneImageUrl} alt="scene" className="w-full h-full object-cover" />
-                  ) : (
-                      <span className="text-gray-500 text-sm">{withImage ? "아직 생성된 그림이 없습니다." : "이미지 생성을 꺼 두었습니다. (옵션에서 변경)"}</span>
-                  )}
-                  {gameState.isImgLoading && (
-                      <div className="absolute inset-0 bg-black/20 flex items-center justify-center">
-                          <Spinner label="이미지 생성 중…" />
-                      </div>
-                  )}
+                {gameState.sceneImageUrl ? (
+                  <img src={gameState.sceneImageUrl} alt="scene" className="w-full h-full object-cover" />
+                ) : (
+                  <span className="text-gray-500 text-sm">
+                    {withImage ? "아직 생성된 그림이 없습니다." : "이미지 생성을 꺼 두었습니다. (옵션에서 변경)"}
+                  </span>
+                )}
+                {gameState.isImgLoading && (
+                  <div className="absolute inset-0 bg-black/20 flex items-center justify-center">
+                    <Spinner label="이미지 생성 중…" />
+                  </div>
+                )}
               </div>
               {gameState.imgError && <div className="text-sm text-red-600 mt-2">{gameState.imgError}</div>}
             </div>
@@ -916,18 +1147,20 @@ function App() {
           <div className="bg-white shadow-2xl rounded-2xl p-8 border border-gray-200 w-full md:w-1/2 md:max-w-2xl flex-grow flex flex-col space-y-4">
             <h2 className="text-2xl font-bold text-gray-800">스토리</h2>
             {gameState.isTextLoading && <Spinner label="응답 생성 중…" />}
-            
+
             {/* 💡 이미지 부분을 텍스트 위에 배치 */}
             <div className="aspect-video w-full overflow-hidden rounded-lg bg-gray-200 flex items-center justify-center border border-gray-300 relative">
               {gameState.sceneImageUrl ? (
-                  <img src={gameState.sceneImageUrl} alt="scene" className="w-full h-full object-cover" />
+                <img src={gameState.sceneImageUrl} alt="scene" className="w-full h-full object-cover" />
               ) : (
-                  <span className="text-gray-500 text-sm">{withImage ? "아직 생성된 그림이 없습니다." : "이미지 생성을 꺼 두었습니다. (옵션에서 변경)"}</span>
+                <span className="text-gray-500 text-sm">
+                  {withImage ? "아직 생성된 그림이 없습니다." : "이미지 생성을 꺼 두었습니다. (옵션에서 변경)"}
+                </span>
               )}
               {gameState.isImgLoading && (
-                  <div className="absolute inset-0 bg-black/20 flex items-center justify-center">
-                      <Spinner label="이미지 생성 중…" />
-                  </div>
+                <div className="absolute inset-0 bg-black/20 flex items-center justify-center">
+                  <Spinner label="이미지 생성 중…" />
+                </div>
               )}
             </div>
             {gameState.imgError && <div className="text-sm text-red-600 mt-2">{gameState.imgError}</div>}
@@ -956,25 +1189,25 @@ function App() {
                   className="p-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-400"
                 />
                 <div className="flex flex-col gap-2">
-                    {gameState.recommendedAction && gameState.isTypingFinished && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setGameState((prev) => ({ ...prev, userAction: prev.recommendedAction }));
-                          submitAction();
-                        }}
-                        className="bg-purple-500 hover:bg-purple-600 text-white font-semibold py-2 px-5 rounded-xl transition duration-300 disabled:opacity-50"
-                      >
-                        {gameState.recommendedAction} (추천 행동)
-                      </button>
-                    )}
+                  {gameState.recommendedAction && gameState.isTypingFinished && (
                     <button
-                      type="submit"
-                      disabled={!gameState.isTypingFinished || gameState.isTextLoading || !gameState.userAction}
-                      className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-5 rounded-xl transition duration-300 disabled:opacity-50"
+                      type="button"
+                      onClick={() => {
+                        setGameState((prev) => ({ ...prev, userAction: prev.recommendedAction }));
+                        submitAction();
+                      }}
+                      className="bg-purple-500 hover:bg-purple-600 text-white font-semibold py-2 px-5 rounded-xl transition duration-300 disabled:opacity-50"
                     >
-                      {gameState.isTextLoading ? "로딩 중..." : "다음 이야기 진행"}
+                      {gameState.recommendedAction} (추천 행동)
                     </button>
+                  )}
+                  <button
+                    type="submit"
+                    disabled={!gameState.isTypingFinished || gameState.isTextLoading || !gameState.userAction}
+                    className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-5 rounded-xl transition duration-300 disabled:opacity-50"
+                  >
+                    {gameState.isTextLoading ? "로딩 중..." : "다음 이야기 진행"}
+                  </button>
                 </div>
               </form>
             )}
@@ -997,50 +1230,71 @@ function App() {
                 <button onClick={goHome} className="text-sm bg-gray-800 hover:bg-black text-white px-3 py-1.5 rounded-lg">
                   처음으로
                 </button>
-                <button onClick={() => setShowOptions(true)} className="text-sm bg-gray-800 hover:bg-black text-white px-3 py-1.5 rounded-lg">
+                <button
+                  onClick={() => setShowOptions(true)}
+                  className="text-sm bg-gray-800 hover:bg-black text-white px-3 py-1.5 rounded-lg"
+                >
                   옵션
                 </button>
               </div>
             </div>
-            
+
             <div className="bg-gray-50 border border-gray-200 rounded-xl p-4">
               <h3 className="font-bold text-gray-700 mb-3">현재 스탯</h3>
               {/* 스탯 관련 JSX */}
-              <div className={`flex justify-between p-1 rounded-md transition-colors duration-500 border-b border-gray-200 pb-2 mb-2 ${gameState.lastDelta.hp > 0 ? "bg-red-100" : gameState.lastDelta.hp < 0 ? "bg-red-100" : ""}`}>
-                  <span>체력(HP)</span>
-                  <span className="font-semibold flex items-center justify-end w-20">
-                      {gameState.hp}
-                      <DeltaBadge value={gameState.lastDelta.hp} />
-                  </span>
+              <div
+                className={`flex justify-between p-1 rounded-md transition-colors duration-500 border-b border-gray-200 pb-2 mb-2 ${
+                  gameState.lastDelta.hp > 0 ? "bg-red-100" : gameState.lastDelta.hp < 0 ? "bg-red-100" : ""
+                }`}
+              >
+                <span>체력(HP)</span>
+                <span className="font-semibold flex items-center justify-end w-20">
+                  {gameState.hp}
+                  <DeltaBadge value={gameState.lastDelta.hp} />
+                </span>
               </div>
-              <div className={`flex justify-between p-1 rounded-md transition-colors duration-500 border-b border-gray-200 pb-2 mb-2 ${gameState.lastDelta.atk > 0 ? "bg-orange-100" : gameState.lastDelta.atk < 0 ? "bg-orange-100" : ""}`}>
-                  <span>공격력(ATK)</span>
-                  <span className="font-semibold flex items-center justify-end w-20">
-                      {getAdjustedAtk()} {/* 💡 장착 무기 보너스 포함 */}
-                      <DeltaBadge value={gameState.lastDelta.atk} />
-                  </span>
+              <div
+                className={`flex justify-between p-1 rounded-md transition-colors duration-500 border-b border-gray-200 pb-2 mb-2 ${
+                  gameState.lastDelta.atk > 0 ? "bg-orange-100" : gameState.lastDelta.atk < 0 ? "bg-orange-100" : ""
+                }`}
+              >
+                <span>공격력(ATK)</span>
+                <span className="font-semibold flex items-center justify-end w-20">
+                  {getAdjustedAtk()} {/* 💡 장착 무기 보너스 포함 */}
+                  <DeltaBadge value={gameState.lastDelta.atk} />
+                </span>
               </div>
-              <div className={`flex justify-between p-1 rounded-md transition-colors duration-500 border-b border-gray-200 pb-2 mb-2 ${gameState.lastDelta.mp > 0 ? "bg-blue-100" : gameState.lastDelta.mp < 0 ? "bg-blue-100" : ""}`}>
-                  <span>마력(MP)</span>
-                  <span className="font-semibold flex items-center justify-end w-20">
-                      {gameState.mp}
-                      <DeltaBadge value={gameState.lastDelta.mp} />
-                  </span>
+              <div
+                className={`flex justify-between p-1 rounded-md transition-colors duration-500 border-b border-gray-200 pb-2 mb-2 ${
+                  gameState.lastDelta.mp > 0 ? "bg-blue-100" : gameState.lastDelta.mp < 0 ? "bg-blue-100" : ""
+                }`}
+              >
+                <span>마력(MP)</span>
+                <span className="font-semibold flex items-center justify-end w-20">
+                  {gameState.mp}
+                  <DeltaBadge value={gameState.lastDelta.mp} />
+                </span>
               </div>
-              <div className={`flex justify-between p-1 rounded-md transition-colors duration-500 border-b border-gray-200 pb-2 mb-2 ${gameState.lastSurvivalTurn ? "bg-purple-100" : ""}`}>
-                  <span>생존 턴</span>
-                  <span className="font-semibold">{gameState.survivalTurns}</span>
+              <div
+                className={`flex justify-between p-1 rounded-md transition-colors duration-500 border-b border-gray-200 pb-2 mb-2 ${
+                  gameState.lastSurvivalTurn ? "bg-purple-100" : ""
+                }`}
+              >
+                <span>생존 턴</span>
+                <span className="font-semibold">{gameState.survivalTurns}</span>
               </div>
               {!!gameState.hudNotes.length && (
-                  <div className="mt-3">
-                      <div className="text-sm font-semibold text-gray-700 mb-1">최근 변화</div>
-                      <ul className="list-disc list-inside text-sm text-gray-700 space-y-0.5">
-                          {gameState.hudNotes.map((n, i) => (<li key={i}>{n}</li>))}
-                      </ul>
-                  </div>
+                <div className="mt-3">
+                  <div className="text-sm font-semibold text-gray-700 mb-1">최근 변화</div>
+                  <ul className="list-disc list-inside text-sm text-gray-700 space-y-0.5">
+                    {gameState.hudNotes.map((n, i) => (
+                      <li key={i}>{n}</li>
+                    ))}
+                  </ul>
+                </div>
               )}
             </div>
-            
+
             {/* 💡 추가된 소지품 컨테이너 */}
             <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
               <h3 className="text-xl font-bold text-gray-700 mb-2">소지품</h3>
@@ -1049,21 +1303,31 @@ function App() {
               <div className="mb-4">
                 <h4 className="text-lg font-bold text-gray-600 mb-1">장착 중인 아이템 ⚔️🛡️</h4>
                 <div className="flex flex-wrap gap-2 items-center">
-                    {gameState.equippedWeapon && (
-                        <div className="flex items-center gap-2 px-3 py-1.5 text-sm rounded-lg bg-purple-200 text-purple-800 border border-purple-300">
-                            <span>{gameState.equippedWeapon.name} (+{gameState.equippedWeapon.atkBonus} ATK)</span>
-                            <button onClick={() => handleUnequipItem(gameState.equippedWeapon!)} className="ml-1 text-xs bg-purple-600 hover:bg-purple-700 text-white py-1 px-2 rounded-md transition-colors">해제</button>
-                        </div>
-                    )}
-                    {gameState.equippedArmor && (
-                        <div className="flex items-center gap-2 px-3 py-1.5 text-sm rounded-lg bg-indigo-200 text-indigo-800 border border-indigo-300">
-                            <span>{gameState.equippedArmor.name}</span>
-                            <button onClick={() => handleUnequipItem(gameState.equippedArmor!)} className="ml-1 text-xs bg-indigo-600 hover:bg-indigo-700 text-white py-1 px-2 rounded-md transition-colors">해제</button>
-                        </div>
-                    )}
-                    {!gameState.equippedWeapon && !gameState.equippedArmor && (
-                        <span className="text-gray-500">없음</span>
-                    )}
+                  {gameState.equippedWeapon && (
+                    <div className="flex items-center gap-2 px-3 py-1.5 text-sm rounded-lg bg-purple-200 text-purple-800 border border-purple-300">
+                      <span>
+                        {gameState.equippedWeapon.name} (+{gameState.equippedWeapon.atkBonus} ATK)
+                      </span>
+                      <button
+                        onClick={() => handleUnequipItem(gameState.equippedWeapon!)}
+                        className="ml-1 text-xs bg-purple-600 hover:bg-purple-700 text-white py-1 px-2 rounded-md transition-colors"
+                      >
+                        해제
+                      </button>
+                    </div>
+                  )}
+                  {gameState.equippedArmor && (
+                    <div className="flex items-center gap-2 px-3 py-1.5 text-sm rounded-lg bg-indigo-200 text-indigo-800 border border-indigo-300">
+                      <span>{gameState.equippedArmor.name}</span>
+                      <button
+                        onClick={() => handleUnequipItem(gameState.equippedArmor!)}
+                        className="ml-1 text-xs bg-indigo-600 hover:bg-indigo-700 text-white py-1 px-2 rounded-md transition-colors"
+                      >
+                        해제
+                      </button>
+                    </div>
+                  )}
+                  {!gameState.equippedWeapon && !gameState.equippedArmor && <span className="text-gray-500">없음</span>}
                 </div>
               </div>
 
@@ -1071,13 +1335,25 @@ function App() {
               <div className="mb-4">
                 <h4 className="text-lg font-bold text-gray-600 mb-1">무기 ⚔️</h4>
                 <div className="flex flex-wrap gap-2">
-                  {gameState.items.filter(item => item.type === "weapon").length > 0 ? (
-                    gameState.items.filter(item => item.type === "weapon").map((item, i) => (
-                      <div key={i} className="flex items-center gap-2 px-3 py-1.5 text-sm rounded-lg bg-purple-100 text-purple-700 border border-purple-200">
-                        <span>{item.name} {item.quantity > 1 ? `x${item.quantity}` : ""} {item.atkBonus ? `(+${item.atkBonus} ATK)` : ""}</span>
-                        <button onClick={() => handleEquipItem(item)} className="ml-1 text-xs bg-purple-600 hover:bg-purple-700 text-white py-1 px-2 rounded-md transition-colors">장착</button>
-                      </div>
-                    ))
+                  {gameState.items.filter((item) => item.type === "weapon").length > 0 ? (
+                    gameState.items
+                      .filter((item) => item.type === "weapon")
+                      .map((item, i) => (
+                        <div
+                          key={i}
+                          className="flex items-center gap-2 px-3 py-1.5 text-sm rounded-lg bg-purple-100 text-purple-700 border border-purple-200"
+                        >
+                          <span>
+                            {item.name} {item.quantity > 1 ? `x${item.quantity}` : ""} {item.atkBonus ? `(+${item.atkBonus} ATK)` : ""}
+                          </span>
+                          <button
+                            onClick={() => handleEquipItem(item)}
+                            className="ml-1 text-xs bg-purple-600 hover:bg-purple-700 text-white py-1 px-2 rounded-md transition-colors"
+                          >
+                            장착
+                          </button>
+                        </div>
+                      ))
                   ) : (
                     <span className="text-gray-500">없음</span>
                   )}
@@ -1088,13 +1364,25 @@ function App() {
               <div className="mb-4">
                 <h4 className="text-lg font-bold text-gray-600 mb-1">방어구 🛡️</h4>
                 <div className="flex flex-wrap gap-2">
-                  {gameState.items.filter(item => item.type === "armor").length > 0 ? (
-                    gameState.items.filter(item => item.type === "armor").map((item, i) => (
-                      <div key={i} className="flex items-center gap-2 px-3 py-1.5 text-sm rounded-lg bg-indigo-100 text-indigo-700 border border-indigo-200">
-                        <span>{item.name} {item.quantity > 1 ? `x${item.quantity}` : ""}</span>
-                        <button onClick={() => handleEquipItem(item)} className="ml-1 text-xs bg-indigo-600 hover:bg-indigo-700 text-white py-1 px-2 rounded-md transition-colors">장착</button>
-                      </div>
-                    ))
+                  {gameState.items.filter((item) => item.type === "armor").length > 0 ? (
+                    gameState.items
+                      .filter((item) => item.type === "armor")
+                      .map((item, i) => (
+                        <div
+                          key={i}
+                          className="flex items-center gap-2 px-3 py-1.5 text-sm rounded-lg bg-indigo-100 text-indigo-700 border border-indigo-200"
+                        >
+                          <span>
+                            {item.name} {item.quantity > 1 ? `x${item.quantity}` : ""}
+                          </span>
+                          <button
+                            onClick={() => handleEquipItem(item)}
+                            className="ml-1 text-xs bg-indigo-600 hover:bg-indigo-700 text-white py-1 px-2 rounded-md transition-colors"
+                          >
+                            장착
+                          </button>
+                        </div>
+                      ))
                   ) : (
                     <span className="text-gray-500">없음</span>
                   )}
@@ -1105,13 +1393,25 @@ function App() {
               <div className="mb-4">
                 <h4 className="text-lg font-bold text-gray-600 mb-1">음식 🍎</h4>
                 <div className="flex flex-wrap gap-2 items-center">
-                  {gameState.items.filter(item => item.type === "food").length > 0 ? (
-                    gameState.items.filter(item => item.type === "food").map((item, i) => (
-                      <div key={i} className="flex items-center gap-2 px-3 py-1.5 text-sm rounded-lg bg-green-100 text-green-700 border border-green-200">
-                        <span>{item.name} {item.quantity > 1 ? `x${item.quantity}` : ""}</span>
-                        <button onClick={() => handleUseItem(item)} className="ml-1 text-xs bg-green-600 hover:bg-green-700 text-white py-1 px-2 rounded-md transition-colors">사용</button>
-                      </div>
-                    ))
+                  {gameState.items.filter((item) => item.type === "food").length > 0 ? (
+                    gameState.items
+                      .filter((item) => item.type === "food")
+                      .map((item, i) => (
+                        <div
+                          key={i}
+                          className="flex items-center gap-2 px-3 py-1.5 text-sm rounded-lg bg-green-100 text-green-700 border border-green-200"
+                        >
+                          <span>
+                            {item.name} {item.quantity > 1 ? `x${item.quantity}` : ""}
+                          </span>
+                          <button
+                            onClick={() => handleUseItem(item)}
+                            className="ml-1 text-xs bg-green-600 hover:bg-green-700 text-white py-1 px-2 rounded-md transition-colors"
+                          >
+                            사용
+                          </button>
+                        </div>
+                      ))
                   ) : (
                     <span className="text-gray-500">없음</span>
                   )}
@@ -1122,13 +1422,25 @@ function App() {
               <div className="mb-4">
                 <h4 className="text-lg font-bold text-gray-600 mb-1">포션 🧪</h4>
                 <div className="flex flex-wrap gap-2 items-center">
-                  {gameState.items.filter(item => item.type === "potion").length > 0 ? (
-                    gameState.items.filter(item => item.type === "potion").map((item, i) => (
-                      <div key={i} className="flex items-center gap-2 px-3 py-1.5 text-sm rounded-lg bg-red-100 text-red-700 border border-red-200">
-                        <span>{item.name} {item.quantity > 1 ? `x${item.quantity}` : ""}</span>
-                        <button onClick={() => handleUseItem(item)} className="ml-1 text-xs bg-red-600 hover:bg-red-700 text-white py-1 px-2 rounded-md transition-colors">사용</button>
-                      </div>
-                    ))
+                  {gameState.items.filter((item) => item.type === "potion").length > 0 ? (
+                    gameState.items
+                      .filter((item) => item.type === "potion")
+                      .map((item, i) => (
+                        <div
+                          key={i}
+                          className="flex items-center gap-2 px-3 py-1.5 text-sm rounded-lg bg-red-100 text-red-700 border border-red-200"
+                        >
+                          <span>
+                            {item.name} {item.quantity > 1 ? `x${item.quantity}` : ""}
+                          </span>
+                          <button
+                            onClick={() => handleUseItem(item)}
+                            className="ml-1 text-xs bg-red-600 hover:bg-red-700 text-white py-1 px-2 rounded-md transition-colors"
+                          >
+                            사용
+                          </button>
+                        </div>
+                      ))
                   ) : (
                     <span className="text-gray-500">없음</span>
                   )}
@@ -1139,12 +1451,14 @@ function App() {
               <div className="mb-4">
                 <h4 className="text-lg font-bold text-gray-600 mb-1">열쇠 🔑</h4>
                 <div className="flex flex-wrap gap-2">
-                  {gameState.items.filter(item => item.type === "key").length > 0 ? (
-                    gameState.items.filter(item => item.type === "key").map((item, i) => (
-                      <span key={i} className="px-3 py-1.5 text-sm rounded-lg bg-yellow-100 text-yellow-700 border border-yellow-200">
-                        {item.name} {item.quantity > 1 ? `x${item.quantity}` : ""}
-                      </span>
-                    ))
+                  {gameState.items.filter((item) => item.type === "key").length > 0 ? (
+                    gameState.items
+                      .filter((item) => item.type === "key")
+                      .map((item, i) => (
+                        <span key={i} className="px-3 py-1.5 text-sm rounded-lg bg-yellow-100 text-yellow-700 border border-yellow-200">
+                          {item.name} {item.quantity > 1 ? `x${item.quantity}` : ""}
+                        </span>
+                      ))
                   ) : (
                     <span className="text-gray-500">없음</span>
                   )}
@@ -1155,12 +1469,14 @@ function App() {
               <div className="mb-4">
                 <h4 className="text-lg font-bold text-gray-600 mb-1">책 📖</h4>
                 <div className="flex flex-wrap gap-2">
-                  {gameState.items.filter(item => item.type === "book").length > 0 ? (
-                    gameState.items.filter(item => item.type === "book").map((item, i) => (
-                      <span key={i} className="px-3 py-1.5 text-sm rounded-lg bg-cyan-100 text-cyan-700 border border-cyan-200">
-                        {item.name} {item.quantity > 1 ? `x${item.quantity}` : ""}
-                      </span>
-                    ))
+                  {gameState.items.filter((item) => item.type === "book").length > 0 ? (
+                    gameState.items
+                      .filter((item) => item.type === "book")
+                      .map((item, i) => (
+                        <span key={i} className="px-3 py-1.5 text-sm rounded-lg bg-cyan-100 text-cyan-700 border border-cyan-200">
+                          {item.name} {item.quantity > 1 ? `x${item.quantity}` : ""}
+                        </span>
+                      ))
                   ) : (
                     <span className="text-gray-500">없음</span>
                   )}
@@ -1171,12 +1487,14 @@ function App() {
               <div>
                 <h4 className="text-lg font-bold text-gray-600 mb-1">기타 📦</h4>
                 <div className="flex flex-wrap gap-2">
-                  {gameState.items.filter(item => item.type === "misc").length > 0 ? (
-                    gameState.items.filter(item => item.type === "misc").map((item, i) => (
-                      <span key={i} className="px-3 py-1.5 text-sm rounded-lg bg-gray-200 text-gray-800 border border-gray-300">
-                        {item.name} {item.quantity > 1 ? `x${item.quantity}` : ""}
-                      </span>
-                    ))
+                  {gameState.items.filter((item) => item.type === "misc").length > 0 ? (
+                    gameState.items
+                      .filter((item) => item.type === "misc")
+                      .map((item, i) => (
+                        <span key={i} className="px-3 py-1.5 text-sm rounded-lg bg-gray-200 text-gray-800 border border-gray-300">
+                          {item.name} {item.quantity > 1 ? `x${item.quantity}` : ""}
+                        </span>
+                      ))
                   ) : (
                     <span className="text-gray-500">없음</span>
                   )}
@@ -1186,14 +1504,89 @@ function App() {
           </div>
         </div>
       )}
-      
+
       {/* 기존 모달들 */}
       {showOptions && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
           <div className="absolute inset-0 bg-black/40" onClick={() => setShowOptions(false)} aria-hidden="true" />
           <div className="relative bg-white w-full max-w-md mx-4 rounded-2xl shadow-xl border border-gray-200 p-8 max-h-5/6 overflow-y-auto">
             <h2 className="text-3xl font-extrabold text-purple-700 text-center mb-6">게임 설정</h2>
+            {/* ===== 장르 설정 ===== */}
+            <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-6">
+              <h3 className="font-bold text-gray-700 mb-3">장르 설정</h3>
 
+              {/* 모드 */}
+              <div className="flex gap-3 mb-3 text-sm">
+                <label className="flex items-center gap-2">
+                  <input type="radio" checked={genreModeUI === "fixed"} onChange={() => setGenreModeUI("fixed")} />
+                  <span>고정</span>
+                </label>
+                <label className="flex items-center gap-2">
+                  <input type="radio" checked={genreModeUI === "random-run"} onChange={() => setGenreModeUI("random-run")} />
+                  <span>한 판 시작 시 랜덤</span>
+                </label>
+                <label className="flex items-center gap-2">
+                  <input type="radio" checked={genreModeUI === "rotate-turn"} onChange={() => setGenreModeUI("rotate-turn")} />
+                  <span>턴마다 순환</span>
+                </label>
+              </div>
+
+              {/* 장르 칩 선택 (고정/순환의 기준 시작 장르) */}
+              <div className="flex flex-wrap gap-2">
+                {GENRES.map((g) => {
+                  const active = selectedGenreIdUI === g.id;
+                  return (
+                    <button
+                      key={g.id}
+                      type="button"
+                      onClick={() => setSelectedGenreIdUI(g.id)}
+                      className={`px-3 py-1.5 rounded-full border text-sm
+            ${active ? "bg-purple-600 text-white border-purple-700" : "bg-white text-gray-700 border-gray-300 hover:bg-gray-100"}`}
+                      title={`${g.label} · ${g.systemStyle}`}
+                    >
+                      {g.label}
+                    </button>
+                  );
+                })}
+                <button
+                  type="button"
+                  onClick={() => setSelectedGenreIdUI(null)}
+                  className={`px-3 py-1.5 rounded-full border text-sm
+        ${
+          selectedGenreIdUI == null
+            ? "bg-indigo-600 text-white border-indigo-700"
+            : "bg-white text-gray-700 border-gray-300 hover:bg-gray-100"
+        }`}
+                  title="아무 장르 고정하지 않음"
+                >
+                  (제한 없음)
+                </button>
+              </div>
+
+              <p className="text-xs text-gray-500 mt-2">
+                • 고정: 선택한 장르로만 진행 · 한 판 랜덤: 시작 시 임의 장르 선택 · 순환: 각 턴마다 다음 장르로 넘어감
+              </p>
+
+              {/* 적용 버튼 */}
+              <div className="mt-4 flex justify-center">
+                <button
+                  onClick={() => {
+                    setGameState((prev) => ({
+                      ...prev,
+                      genreMode: genreModeUI,
+                      selectedGenreId: selectedGenreIdUI,
+                    }));
+                    // 로컬스토리지에 선호 저장(선택)
+                    localStorage.setItem("ai_game_pref_genreMode", genreModeUI);
+                    localStorage.setItem("ai_game_pref_selectedGenreId", selectedGenreIdUI ?? "");
+                    setShowOptions(false);
+                  }}
+                  className="px-4 py-2 rounded-lg bg-indigo-600 text-white font-semibold hover:bg-indigo-700 transition"
+                >
+                  장르 설정 적용
+                </button>
+              </div>
+            </div>
             <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-6">
               <h3 className="font-bold text-gray-700 mb-3">스토리 생성 설정</h3>
               <label className="flex items-center gap-3 select-none">
@@ -1215,37 +1608,46 @@ function App() {
               <h3 className="font-bold text-gray-700 mb-3">초기 스탯 설정</h3>
               <div className="space-y-4">
                 <div>
-                  <label htmlFor="hp-slider" className="block text-sm font-semibold mb-1">체력 (HP): (1~500) {initialStats.hp}</label>
+                  <label htmlFor="hp-slider" className="block text-sm font-semibold mb-1">
+                    체력 (HP): (1~500) {initialStats.hp}
+                  </label>
                   <input
                     id="hp-slider"
                     type="range"
-                    min="1" max="500"
+                    min="1"
+                    max="500"
                     value={initialStats.hp}
-                    onChange={(e) => setInitialStats({...initialStats, hp: Number(e.target.value)})}
+                    onChange={(e) => setInitialStats({ ...initialStats, hp: Number(e.target.value) })}
                     className="w-full h-2 rounded-lg appearance-none bg-purple-200"
                     disabled={gameState.survivalTurns > 0}
                   />
                 </div>
                 <div>
-                  <label htmlFor="atk-slider" className="block text-sm font-semibold mb-1">공격력 (ATK): (1~200) {initialStats.atk}</label>
+                  <label htmlFor="atk-slider" className="block text-sm font-semibold mb-1">
+                    공격력 (ATK): (1~200) {initialStats.atk}
+                  </label>
                   <input
                     id="atk-slider"
                     type="range"
-                    min="1" max="200"
+                    min="1"
+                    max="200"
                     value={initialStats.atk}
-                    onChange={(e) => setInitialStats({...initialStats, atk: Number(e.target.value)})}
+                    onChange={(e) => setInitialStats({ ...initialStats, atk: Number(e.target.value) })}
                     className="w-full h-2 rounded-lg appearance-none bg-purple-200"
                     disabled={gameState.survivalTurns > 0}
                   />
                 </div>
                 <div>
-                  <label htmlFor="mp-slider" className="block text-sm font-semibold mb-1">마력 (MP): (1~200) {initialStats.mp}</label>
+                  <label htmlFor="mp-slider" className="block text-sm font-semibold mb-1">
+                    마력 (MP): (1~200) {initialStats.mp}
+                  </label>
                   <input
                     id="mp-slider"
                     type="range"
-                    min="1" max="200"
+                    min="1"
+                    max="200"
                     value={initialStats.mp}
-                    onChange={(e) => setInitialStats({...initialStats, mp: Number(e.target.value)})}
+                    onChange={(e) => setInitialStats({ ...initialStats, mp: Number(e.target.value) })}
                     className="w-full h-2 rounded-lg appearance-none bg-purple-200"
                     disabled={gameState.survivalTurns > 0}
                   />
@@ -1350,7 +1752,9 @@ function App() {
               </div>
             </div>
 
-            <div className="mt-6 flex justify-center sticky bottom-0 mb-6">    {/* 💡 닫기 버튼이 항상 보이도록 수정 */}
+            <div className="mt-6 flex justify-center sticky bottom-0 mb-6">
+              {" "}
+              {/* 💡 닫기 버튼이 항상 보이도록 수정 */}
               <button
                 onClick={() => setShowOptions(false)}
                 className="w-full py-2 rounded-lg bg-gray-200 hover:bg-gray-400 text-gray-800 font-semibold"
