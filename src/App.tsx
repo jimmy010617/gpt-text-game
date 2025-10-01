@@ -188,6 +188,11 @@ type GameState = {
   selectedGenreId?: string | null; // 사용자가 고른 장르 (없으면 null)
   genreMode: GenreMode; // "fixed" | "random-run" | "rotate-turn"
   turnInRun: number;
+  // 🔸 최대 턴 & 엔딩
+  maxTurns: number; // 사용자가 정하는 최대 턴수
+  isRunComplete: boolean; // 최대 턴 도달로 러닝 종료
+  achievements: string[]; // 업적 목록
+  ending: string; // 엔딩 서사(문단)
 };
 
 type AskResult = {
@@ -267,6 +272,11 @@ const DEFAULT_INITIAL_STATE: GameState = {
   selectedGenreId: null,
   genreMode: "random-run",
   turnInRun: 0,
+  // 🔸 추가
+  maxTurns: 5,
+  isRunComplete: false,
+  achievements: [],
+  ending: "",
 };
 
 // ===== 유틸: 초기 상태 불러오기 =====
@@ -306,6 +316,10 @@ const loadInitialState = (): GameState => {
         selectedGenreId: loadedState.selectedGenreId ?? null,
         genreMode: (loadedState.genreMode as GenreMode) ?? "fixed",
         turnInRun: loadedState.turnInRun ?? 0,
+        maxTurns: loadedState.maxTurns ?? 5,
+        isRunComplete: loadedState.isRunComplete ?? false,
+        achievements: loadedState.achievements ?? [],
+        ending: loadedState.ending ?? "",
       };
     }
   } catch (e) {
@@ -347,6 +361,47 @@ function App() {
   const getAdjustedAtk = useCallback(() => {
     return gameState.atk + (gameState.equippedWeapon?.atkBonus || 0);
   }, [gameState.atk, gameState.equippedWeapon]);
+
+  // 🔸 업적 계산: 현재 상태를 기준으로 간단한 규칙 기반 업적을 부여
+  function computeAchievements(s: GameState): string[] {
+    const a: string[] = [];
+    if (s.hp >= 100) a.push("철인: 체력을 100 이상 유지했다");
+    if (s.items.some((i) => i.type === "weapon" && (i.atkBonus ?? 0) >= 10)) a.push("무장완료: 강력한 무기를 확보했다");
+    if (s.items.filter((i) => i.type === "food").length >= 3) a.push("비축왕: 음식 아이템을 3개 이상 보유했다");
+    if (s.survivalTurns >= s.maxTurns) a.push(`끝까지 버텨냈다: ${s.maxTurns}턴 생존 달성`);
+    if (s.equippedWeapon) a.push(`무기 장착: ${s.equippedWeapon.name}`);
+    if (s.equippedArmor) a.push(`방어구 장착: ${s.equippedArmor.name}`);
+    if (a.length === 0) a.push("소소한 생존자: 평범하지만 꾸준히 버텼다");
+    return a.slice(0, 6);
+  }
+
+  // 🔸 엔딩 생성: Gemini로 짧은 에필로그(한국어 5~7문장) 요청
+  async function generateEndingNarrative(ai: any, s: GameState, genreText: string): Promise<string> {
+    if (!ai) {
+      return "엔딩 생성 실패: API 키가 없어 기본 엔딩으로 마감합니다.\n당신은 묵묵히 버텨냈고, 다음 생존을 기약합니다.";
+    }
+    const summary = [
+      `HP=${s.hp}, ATK=${s.atk + (s.equippedWeapon?.atkBonus ?? 0)}, MP=${s.mp}`,
+      `턴=${s.survivalTurns}/${s.maxTurns}`,
+      `무기=${s.equippedWeapon?.name ?? "없음"}, 방어구=${s.equippedArmor?.name ?? "없음"}`,
+      `아이템=${s.items.map((i) => `${i.name}x${i.quantity}`).join(", ") || "없음"}`,
+    ].join(" | ");
+
+    const prompt =
+      `${genreText}\n` +
+      `다음 플레이어 상태 요약을 반영해 러닝 엔딩을 한국어 5~7문장으로 작성. 감정선과 선택의 여운을 남기되, 새 전투를 시작하지 말 것.\n` +
+      `요약: ${summary}\n` +
+      `요구사항: 목록/머리말 없이 순수 문단 서술. 과도한 영웅담 지양, 현실감 있게.`;
+
+    const res = await ai.models.generateContent({
+      model: TEXT_MODEL,
+      contents: [{ role: "user", parts: [{ text: prompt }] }],
+      config: { temperature: 0.8, maxOutputTokens: 500 },
+    });
+
+    const out = (res?.text ?? "").trim();
+    return out || "긴 생존 끝에 당신은 잠시 숨을 고른다. 오늘을 버텼다는 사실만으로도 충분했다.";
+  }
 
   // 💡 아이템 사용 핸들러
   const handleUseItem = useCallback((itemToUse: Item) => {
@@ -499,6 +554,29 @@ function App() {
     }
     setSlots(slotsData);
   }, []);
+
+  // 🔸 최대 턴 도달 시 엔딩을 확정하고 입력을 막는다
+  useEffect(() => {
+    (async () => {
+      if (!gameState.isRunComplete || gameState.ending) return;
+
+      const turnForGenre = gameState.turnInRun; // 현재 회차 기준
+      const { genreText } = buildGenreDirectivesForPrompt(gameState.genreMode, gameState.selectedGenreId, turnForGenre);
+
+      const ach = computeAchievements(gameState);
+      let endingText = await generateEndingNarrative(ai, gameState, genreText).catch(() => "");
+
+      setGameState((prev) => ({
+        ...prev,
+        achievements: ach,
+        ending: endingText || "엔딩을 불러오지 못했습니다. 그래도 당신의 생존은 의미 있었습니다.",
+      }));
+
+      // 자동 저장
+      autoSaveGame();
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gameState.isRunComplete]);
   const autoSaveGame = useCallback(() => {
     const {
       story,
@@ -515,6 +593,11 @@ function App() {
       selectedGenreId,
       genreMode,
       turnInRun,
+      // 🔸 추가 저장
+      maxTurns,
+      isRunComplete,
+      achievements,
+      ending,
     } = gameState;
 
     const autoSaveState = {
@@ -532,6 +615,10 @@ function App() {
       selectedGenreId,
       genreMode,
       turnInRun,
+      maxTurns,
+      isRunComplete,
+      achievements,
+      ending, // 🔸
     };
     try {
       localStorage.setItem("ai_game_auto_save", JSON.stringify(autoSaveState));
@@ -693,7 +780,6 @@ function App() {
 
     return notes;
   }
-
   function applyDeltasAndItems({ deltas, itemsAdd, itemsRemove }: { deltas: Delta[]; itemsAdd: string[]; itemsRemove: string[] }) {
     setGameState((prev) => {
       let newHp = prev.hp;
@@ -724,23 +810,16 @@ function App() {
       if (itemsAdd?.length) {
         itemsAdd.forEach((itemName) => {
           const existingItem = newItems.find((item) => item.name === itemName);
-          if (existingItem) {
-            existingItem.quantity += 1;
-          } else {
-            newItems.push({ name: itemName, quantity: 1, type: categorizeItem(itemName) });
-          }
+          if (existingItem) existingItem.quantity += 1;
+          else newItems.push({ name: itemName, quantity: 1, type: categorizeItem(itemName) });
         });
       }
-
       if (itemsRemove?.length) {
         itemsRemove.forEach((itemName) => {
-          const itemIndex = newItems.findIndex((item) => item.name === itemName);
-          if (itemIndex > -1) {
-            if (newItems[itemIndex].quantity > 1) {
-              newItems[itemIndex].quantity -= 1;
-            } else {
-              newItems.splice(itemIndex, 1);
-            }
+          const idx = newItems.findIndex((item) => item.name === itemName);
+          if (idx > -1) {
+            if (newItems[idx].quantity > 1) newItems[idx].quantity -= 1;
+            else newItems.splice(idx, 1);
           }
         });
       }
@@ -752,6 +831,9 @@ function App() {
         lastSurvivalTurn = "highlight";
       }
 
+      // 🔸 최대 턴 도달 여부
+      const reachedMax = !isGameOver && prev.maxTurns > 0 && newSurvivalTurns >= prev.maxTurns;
+
       return {
         ...prev,
         hp: Math.max(0, newHp),
@@ -760,9 +842,12 @@ function App() {
         items: newItems,
         survivalTurns: newSurvivalTurns,
         lastSurvivalTurn,
-        hudNotes: newHudNotes,
+        hudNotes: reachedMax ? ["최대 턴에 도달했습니다. 엔딩을 기록합니다.", ...newHudNotes].slice(0, 6) : newHudNotes,
         isGameOver,
         lastDelta: { hp: dHp, atk: dAtk, mp: dMp },
+
+        // 🔸 러닝 종료 플래그
+        isRunComplete: reachedMax || prev.isRunComplete,
       };
     });
 
@@ -840,6 +925,10 @@ function App() {
       isTypingFinished: false,
       turnInRun: 0,
       selectedGenreId: nextSelected, // 한 판 랜덤이면 여기서 확정
+
+      isRunComplete: false,
+      achievements: [],
+      ending: "",
     }));
 
     const { genreText } = buildGenreDirectivesForPrompt(gameState.genreMode, nextSelected, 0);
@@ -879,7 +968,8 @@ function App() {
   };
 
   const submitAction = async () => {
-    if (!ensureApi() || !gameState.story || gameState.isGameOver) return;
+    if (!ensureApi() || !gameState.story || gameState.isGameOver || gameState.isRunComplete) return; // 🔸 추가
+
     setGameState((prev) => ({ ...prev, isTextLoading: true }));
 
     // 현재 러닝의 다음 턴 번호(프롬프트 위해 참조)
@@ -958,7 +1048,21 @@ function App() {
   };
 
   const saveGame = (slotNumber: number, name?: string) => {
-    const { story, hp, atk, mp, items, equippedWeapon, equippedArmor, survivalTurns, sceneImageUrl } = gameState;
+    const {
+      story,
+      hp,
+      atk,
+      mp,
+      items,
+      equippedWeapon,
+      equippedArmor,
+      survivalTurns,
+      sceneImageUrl,
+      maxTurns,
+      isRunComplete,
+      achievements,
+      ending,
+    } = gameState; // 🔸
     const saveState = {
       story,
       hp,
@@ -969,6 +1073,10 @@ function App() {
       equippedArmor,
       survivalTurns,
       sceneImageUrl,
+      maxTurns,
+      isRunComplete,
+      achievements,
+      ending, // 🔸
       name: name || `저장 #${slotNumber}`,
       savedAt: new Date().toLocaleString(),
     };
@@ -986,42 +1094,88 @@ function App() {
     }
   };
 
+  type LoadedSave = {
+    story: string;
+    hp: number;
+    atk: number;
+    mp: number;
+    items: Item[];
+    equippedWeapon: Item | null;
+    equippedArmor: Item | null;
+    survivalTurns: number;
+    sceneImageUrl: string;
+    name?: string;
+    savedAt?: string;
+
+    // 선택적(버전에 따라 없을 수 있음)
+    maxTurns?: number;
+    isRunComplete?: boolean;
+    achievements?: string[];
+    ending?: string;
+    selectedGenreId?: string | null;
+    genreMode?: GenreMode;
+    turnInRun?: number;
+    recommendedAction?: string;
+    isGameOver?: boolean;
+  };
+  // 👉 저장 슬롯에서 불러올 때 사용할 타입
+
+  // 👉 슬롯에서 게임 불러오기 (전체 교체용)
   const loadGame = (slotNumber: number) => {
     try {
       const savedState = localStorage.getItem(`ai_game_save_${slotNumber}`);
-      if (savedState) {
-        const loaded = JSON.parse(savedState) as {
-          story: string;
-          hp: number;
-          atk: number;
-          mp: number;
-          items: Item[];
-          equippedWeapon: Item | null;
-          equippedArmor: Item | null;
-          survivalTurns: number;
-          sceneImageUrl: string;
-          name?: string;
-        };
-        setGameState((prev) => ({
-          ...prev,
-          story: loaded.story,
-          typingStory: "",
-          hp: loaded.hp,
-          atk: loaded.atk,
-          mp: loaded.mp,
-          items: loaded.items,
-          equippedWeapon: loaded.equippedWeapon,
-          equippedArmor: loaded.equippedArmor,
-          survivalTurns: loaded.survivalTurns,
-          sceneImageUrl: loaded.sceneImageUrl,
-          isGameOver: false,
-          isTypingFinished: false,
-        }));
-        setSaveName(loaded.name || "");
-        alert(`${slotNumber}번의 게임을 불러왔습니다!`);
-      } else {
+      if (!savedState) {
         alert(`${slotNumber}번에 저장된 게임이 없습니다.`);
+        return;
       }
+
+      const loaded = JSON.parse(savedState) as LoadedSave;
+
+      setGameState((prev) => ({
+        ...prev,
+
+        // 본문/타이핑
+        story: loaded.story ?? "",
+        typingStory: "",
+        isTypingFinished: false,
+
+        // 스탯/인벤/장비
+        hp: loaded.hp ?? prev.hp,
+        atk: loaded.atk ?? prev.atk,
+        mp: loaded.mp ?? prev.mp,
+        items: Array.isArray(loaded.items) ? loaded.items : prev.items,
+        equippedWeapon: loaded.equippedWeapon ?? null,
+        equippedArmor: loaded.equippedArmor ?? null,
+
+        // 진행도
+        survivalTurns: loaded.survivalTurns ?? 0,
+        turnInRun: loaded.turnInRun ?? 0,
+
+        // 이미지
+        sceneImageUrl: loaded.sceneImageUrl ?? "",
+        isImgLoading: false,
+        imgError: "",
+
+        // 러닝/엔딩 상태
+        maxTurns: loaded.maxTurns ?? prev.maxTurns ?? 5,
+        isRunComplete: loaded.isRunComplete ?? false,
+        achievements: loaded.achievements ?? [],
+        ending: loaded.ending ?? "",
+
+        // 기타
+        isGameOver: loaded.isGameOver ?? false,
+        recommendedAction: loaded.recommendedAction ?? "",
+        userAction: "",
+        lastDelta: { hp: 0, atk: 0, mp: 0 }, // 시각 효과 초기화
+        lastSurvivalTurn: "",
+
+        // 장르
+        selectedGenreId: loaded.selectedGenreId ?? prev.selectedGenreId ?? null,
+        genreMode: (loaded.genreMode as GenreMode) ?? prev.genreMode ?? "random-run",
+      }));
+
+      setSaveName(loaded.name || "");
+      alert(`${slotNumber}번의 게임을 불러왔습니다!`);
     } catch (e) {
       console.error("Failed to load game:", e);
       alert("게임 불러오기에 실패했습니다.");
@@ -1038,6 +1192,18 @@ function App() {
       alert("게임 삭제에 실패했습니다.");
     }
   };
+
+  // 옵션 모달 열릴 때 UI 동기화
+  useEffect(() => {
+    if (showOptions) {
+      setGenreModeUI(gameState.genreMode);
+      setSelectedGenreIdUI(gameState.selectedGenreId ?? null);
+      setMaxTurnsUI(gameState.maxTurns); // 🔸
+    }
+  }, [showOptions]);
+
+  // 🔸 모달 전용 상태
+  const [maxTurnsUI, setMaxTurnsUI] = useState<number>(gameState.maxTurns);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-indigo-100 to-purple-200 p-6 flex flex-col items-center justify-center">
@@ -1172,7 +1338,7 @@ function App() {
               {gameState.typingStory}
             </div>
 
-            {!gameState.isGameOver && (
+            {!gameState.isGameOver && !gameState.isRunComplete && (
               <form
                 onSubmit={(e) => {
                   e.preventDefault();
@@ -1210,6 +1376,29 @@ function App() {
                   </button>
                 </div>
               </form>
+            )}
+
+            {/* 입력 폼 영역 아래에 추가 */}
+            {gameState.isRunComplete && !gameState.isGameOver && (
+              <div className="mt-4 bg-amber-50 border border-amber-200 rounded-xl p-4">
+                <h3 className="text-xl font-bold text-amber-800 mb-2">🎉 최대 턴 달성! 엔딩</h3>
+                {gameState.achievements.length > 0 && (
+                  <>
+                    <div className="font-semibold text-amber-700 mb-1">획득 업적</div>
+                    <ul className="list-disc list-inside text-amber-900 mb-3">
+                      {gameState.achievements.map((a, i) => (
+                        <li key={i}>{a}</li>
+                      ))}
+                    </ul>
+                  </>
+                )}
+                {gameState.ending && <div className="whitespace-pre-wrap text-amber-900">{gameState.ending}</div>}
+                <div className="mt-4 flex gap-2">
+                  <button onClick={goHome} className="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-6 rounded-xl transition">
+                    홈으로 가기
+                  </button>
+                </div>
+              </div>
             )}
 
             {gameState.isGameOver && (
@@ -1667,6 +1856,33 @@ function App() {
                   className="px-4 py-2 rounded-lg bg-indigo-600 text-white font-semibold hover:bg-indigo-700 transition"
                 >
                   스탯 적용
+                </button>
+              </div>
+            </div>
+
+            <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-6">
+              <h3 className="font-bold text-gray-700 mb-3">최대 턴 설정</h3>
+              <div className="flex items-center gap-3">
+                <input
+                  type="number"
+                  min={1}
+                  max={50}
+                  value={maxTurnsUI}
+                  onChange={(e) => setMaxTurnsUI(Math.max(1, Math.min(50, Number(e.target.value) || 1)))}
+                  className="w-28 p-2 border border-gray-300 rounded-lg"
+                />
+                <span className="text-sm text-gray-600">1~50 사이 권장. 도달 시 업적과 엔딩이 표시됩니다.</span>
+              </div>
+              <div className="mt-3">
+                <button
+                  onClick={() => {
+                    setGameState((prev) => ({ ...prev, maxTurns: maxTurnsUI }));
+                    localStorage.setItem("ai_game_pref_maxTurns", String(maxTurnsUI));
+                    setShowOptions(false);
+                  }}
+                  className="px-4 py-2 rounded-lg bg-indigo-600 text-white font-semibold hover:bg-indigo-700 transition"
+                >
+                  최대 턴 적용
                 </button>
               </div>
             </div>
