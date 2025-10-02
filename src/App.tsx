@@ -1730,7 +1730,7 @@ function App() {
                       type="button"
                       onClick={() => setSelectedGenreIdUI(g.id)}
                       className={`px-3 py-1.5 rounded-full border text-sm
-            ${active ? "bg-purple-600 text-white border-purple-700" : "bg-white text-gray-700 border-gray-300 hover:bg-gray-100"}`}
+            					${active ? "bg-purple-600 text-white border-purple-700" : "bg-white text-gray-700 border-gray-300 hover:bg-gray-100"}`}
                       title={`${g.label} · ${g.systemStyle}`}
                     >
                       {g.label}
@@ -1741,11 +1741,11 @@ function App() {
                   type="button"
                   onClick={() => setSelectedGenreIdUI(null)}
                   className={`px-3 py-1.5 rounded-full border text-sm
-        ${
-          selectedGenreIdUI == null
-            ? "bg-indigo-600 text-white border-indigo-700"
-            : "bg-white text-gray-700 border-gray-300 hover:bg-gray-100"
-        }`}
+									${
+										selectedGenreIdUI == null
+											? "bg-indigo-600 text-white border-indigo-700"
+											: "bg-white text-gray-700 border-gray-300 hover:bg-gray-100"
+									}`}
                   title="아무 장르 고정하지 않음"
                 >
                   (제한 없음)
@@ -1968,12 +1968,12 @@ function App() {
               </div>
             </div>
 
-            <div className="mt-6 flex justify-center sticky bottom-0 mb-6">
+            <div className="mt-6 flex justify-center bottom-0 mb-6">
               {" "}
               {/* 💡 닫기 버튼이 항상 보이도록 수정 */}
               <button
                 onClick={() => setShowOptions(false)}
-                className="w-full py-2 rounded-lg bg-gray-200 hover:bg-gray-400 text-gray-800 font-semibold"
+                className="bottom-0 mb-0 left-0 w-full py-2 rounded-lg bg-gray-200 hover:bg-gray-400 text-gray-800 font-semibold"
               >
                 닫기
               </button>
