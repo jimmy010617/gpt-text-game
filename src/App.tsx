@@ -2,6 +2,8 @@
 import { useMemo, useState, useEffect, useRef, useCallback } from "react";
 import { GoogleGenAI } from "@google/genai";
 
+import SideBar from "./Layout/SideBar";
+
 // 🔑 ENV
 const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY as string | undefined;
 
@@ -340,8 +342,10 @@ function App() {
     atk: gameState.atk,
     mp: gameState.mp,
   });
-
-  const [currentSlot, setCurrentSlot] = useState<number>(1);
+	// 사이드바 표시 여부 관리 상태 추가 
+	const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(false);
+  
+	const [currentSlot, setCurrentSlot] = useState<number>(1);
   const [slots, setSlots] = useState<Array<{ id: number; saved: boolean; name?: string; savedAt?: string }>>([]);
   const [saveName, setSaveName] = useState<string>("");
   const [newItemName, setNewItemName] = useState<string>("");
@@ -1206,22 +1210,52 @@ function App() {
   const [maxTurnsUI, setMaxTurnsUI] = useState<number>(gameState.maxTurns);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-100 to-purple-200 p-6 flex flex-col items-center justify-center">
-      {!gameState.story ? (
+    <div className="min-h-screen bg-base-200 p-6 flex flex-col items-center justify-center">
+      {/* ===== 🔽 2. 사이드바 토글 버튼 추가 🔽 ===== */}
+      <button
+        onClick={() => setIsSidebarOpen(true)}
+        className="fixed top-6 left-6 z-50 bg-base-100 p-4 rounded-full shadow-lg hover:bg-base-200 transition-colors"
+        aria-label="Open sidebar"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+        </svg>
+      </button>
+
+      {/* ===== 🔽 3. 사이드바 및 오버레이 UI 추가 🔽 ===== */}
+      {/* 배경 오버레이 */}
+      <div
+        className={`fixed inset-0 bg-black/40 z-40 transition-opacity ${
+          isSidebarOpen ? "opacity-100" : "opacity-0 pointer-events-none"
+        }`}
+        onClick={() => setIsSidebarOpen(false)}
+        aria-hidden="true"
+      />
+      {/* 사이드바 패널 */}
+      <div
+        className={`fixed top-0 left-0 h-full bg-base-100 shadow-xl z-50 w-64 p-4 transform transition-transform duration-300 ease-in-out ${
+          isSidebarOpen ? "translate-x-0" : "-translate-x-full"
+        }`}
+      >
+        <h2 className="text-2xl font-bold text-center mb-1 mt-4">테마 설정</h2>
+        <SideBar />
+      </div>
+			
+			{!gameState.story ? (
         // ===== 게임 시작 전 UI =====
         <div className="bg-white shadow-2xl rounded-2xl w-full max-w-4xl p-8 space-y-6 border border-gray-200">
           <div className="flex items-center justify-between">
-            <h1 className="text-4xl font-extrabold text-purple-700">AI Text Adventure Game</h1>
+            <h1 className="text-4xl font-extrabold text-primary">AI Text Adventure Game</h1>
             <div className="flex items-center gap-3">
-              <button onClick={() => setShowOptions(true)} className="text-sm bg-gray-800 hover:bg-black text-white px-3 py-1.5 rounded-lg">
+              <button onClick={() => setShowOptions(true)} className="btn btn-outline btn-primary btn-md">
                 설정
               </button>
             </div>
           </div>
           <div className="grid md:grid-cols-2 gap-4">
             {/* 기존 스탯 및 HUD 영역 */}
-            <div className="bg-gray-50 border border-gray-200 rounded-xl p-4">
-              <h2 className="font-bold text-gray-700 mb-3">현재 상태</h2>
+            <div className="bg-gray-50 border border-gray-200 text-gray-700 rounded-xl p-4">
+              <h2 className="font-bold mb-3">현재 상태</h2>
               {/* 스탯 관련 JSX */}
               {/* ... 기존 스탯 JSX 코드 ... */}
               <div
@@ -1267,7 +1301,7 @@ function App() {
               </div>
               {!!gameState.hudNotes.length && (
                 <div className="mt-3">
-                  <div className="text-sm font-semibold text-gray-700 mb-1">최근 변화</div>
+                  <div className="text-sm font-semibold text-base-content mb-1">최근 변화</div>
                   <ul className="list-disc list-inside text-sm text-gray-700 space-y-0.5">
                     {gameState.hudNotes.map((n, i) => (
                       <li key={i}>{n}</li>
@@ -1300,7 +1334,7 @@ function App() {
             <button
               onClick={generateScenario}
               disabled={gameState.isTextLoading || gameState.isGameOver}
-              className="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-6 rounded-xl transition duration-300 disabled:opacity-50"
+              className="btn btn-outline btn-primary btn-md"
             >
               {gameState.isTextLoading ? "로딩 중..." : "새로운 상황 생성"}
             </button>
@@ -1311,7 +1345,7 @@ function App() {
         <div className="w-full max-w-7xl flex flex-col md:flex-row md:justify-center md:items-start md:gap-x-10">
           {/* 💡 왼쪽 패널: 이미지와 텍스트 */}
           <div className="bg-white shadow-2xl rounded-2xl p-8 border border-gray-200 w-full md:w-1/2 md:max-w-2xl flex-grow flex flex-col space-y-4">
-            <h2 className="text-2xl font-bold text-gray-800">스토리</h2>
+            <h2 className="text-2xl font-bold text-base-content bg-base-200 px-4 py-2 rounded-lg">스토리</h2>
             {gameState.isTextLoading && <Spinner label="응답 생성 중…" />}
 
             {/* 💡 이미지 부분을 텍스트 위에 배치 */}
@@ -1333,7 +1367,7 @@ function App() {
 
             <div
               ref={storyRef}
-              className="bg-gray-100 border border-gray-300 rounded-xl p-4 text-lg whitespace-pre-wrap shadow-inner overflow-y-auto max-h-[40vh] flex-grow"
+              className="bg-gray-100 border border-gray-300 rounded-xl p-4 text-lg text-gray-700 whitespace-pre-wrap shadow-inner overflow-y-auto max-h-[40vh] flex-grow"
             >
               {gameState.typingStory}
             </div>
@@ -1352,7 +1386,7 @@ function App() {
                   onChange={(e) => setGameState((prev) => ({ ...prev, userAction: e.target.value }))}
                   placeholder="당신의 행동을 입력하세요..."
                   disabled={!gameState.isTypingFinished || gameState.isTextLoading}
-                  className="p-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-400"
+                  className="p-3 border border-gray-300 text-gray-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-400"
                 />
                 <div className="flex flex-col gap-2">
                   {gameState.recommendedAction && gameState.isTypingFinished && (
@@ -1370,7 +1404,7 @@ function App() {
                   <button
                     type="submit"
                     disabled={!gameState.isTypingFinished || gameState.isTextLoading || !gameState.userAction}
-                    className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-5 rounded-xl transition duration-300 disabled:opacity-50"
+                    className="btn btn-outline btn-primary"
                   >
                     {gameState.isTextLoading ? "로딩 중..." : "다음 이야기 진행"}
                   </button>
@@ -1414,14 +1448,14 @@ function App() {
           {/* 💡 오른쪽 패널: 스탯, 설정, 소지품 */}
           <div className="bg-white shadow-2xl rounded-2xl p-8 border border-gray-200 w-full md:w-1/3 md:min-w-[300px] flex-shrink-0 flex flex-col space-y-6">
             <div className="flex justify-between items-center">
-              <h2 className="text-2xl font-bold text-gray-800">상태창</h2>
+              <h2 className="text-2xl font-bold text-base-content bg-base-200 px-4 py-2 rounded-lg">상태창</h2>
               <div className="flex gap-2">
-                <button onClick={goHome} className="text-sm bg-gray-800 hover:bg-black text-white px-3 py-1.5 rounded-lg">
+                <button onClick={goHome} className="btn btn-outline btn-primary">
                   처음으로
                 </button>
                 <button
                   onClick={() => setShowOptions(true)}
-                  className="text-sm bg-gray-800 hover:bg-black text-white px-3 py-1.5 rounded-lg"
+                  className="btn btn-outline btn-primary"
                 >
                   옵션
                 </button>
@@ -1432,7 +1466,7 @@ function App() {
               <h3 className="font-bold text-gray-700 mb-3">현재 스탯</h3>
               {/* 스탯 관련 JSX */}
               <div
-                className={`flex justify-between p-1 rounded-md transition-colors duration-500 border-b border-gray-200 pb-2 mb-2 ${
+                className={`flex justify-between p-1 text-gray-700 rounded-md transition-colors duration-500 border-b border-gray-200 pb-2 mb-2 ${
                   gameState.lastDelta.hp > 0 ? "bg-red-100" : gameState.lastDelta.hp < 0 ? "bg-red-100" : ""
                 }`}
               >
@@ -1443,7 +1477,7 @@ function App() {
                 </span>
               </div>
               <div
-                className={`flex justify-between p-1 rounded-md transition-colors duration-500 border-b border-gray-200 pb-2 mb-2 ${
+                className={`flex justify-between p-1 text-gray-700 rounded-md transition-colors duration-500 border-b border-gray-200 pb-2 mb-2 ${
                   gameState.lastDelta.atk > 0 ? "bg-orange-100" : gameState.lastDelta.atk < 0 ? "bg-orange-100" : ""
                 }`}
               >
@@ -1454,7 +1488,7 @@ function App() {
                 </span>
               </div>
               <div
-                className={`flex justify-between p-1 rounded-md transition-colors duration-500 border-b border-gray-200 pb-2 mb-2 ${
+                className={`flex justify-between p-1 rounded-md text-gray-700 transition-colors duration-500 border-b border-gray-200 pb-2 mb-2 ${
                   gameState.lastDelta.mp > 0 ? "bg-blue-100" : gameState.lastDelta.mp < 0 ? "bg-blue-100" : ""
                 }`}
               >
@@ -1465,7 +1499,7 @@ function App() {
                 </span>
               </div>
               <div
-                className={`flex justify-between p-1 rounded-md transition-colors duration-500 border-b border-gray-200 pb-2 mb-2 ${
+                className={`flex justify-between p-1 rounded-md text-gray-700 transition-colors duration-500 border-b border-gray-200 pb-2 mb-2 ${
                   gameState.lastSurvivalTurn ? "bg-purple-100" : ""
                 }`}
               >
@@ -1474,7 +1508,7 @@ function App() {
               </div>
               {!!gameState.hudNotes.length && (
                 <div className="mt-3">
-                  <div className="text-sm font-semibold text-gray-700 mb-1">최근 변화</div>
+                  <div className="text-sm font-semibold text-base-content mb-1">최근 변화</div>
                   <ul className="list-disc list-inside text-sm text-gray-700 space-y-0.5">
                     {gameState.hudNotes.map((n, i) => (
                       <li key={i}>{n}</li>
@@ -1485,12 +1519,12 @@ function App() {
             </div>
 
             {/* 💡 추가된 소지품 컨테이너 */}
+						<h2 className="text-2xl font-bold text-base-content bg-base-200 px-4 py-1 rounded-lg">소지품</h2>
             <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-              <h3 className="text-xl font-bold text-gray-700 mb-2">소지품</h3>
 
               {/* 💡 장착 중인 아이템 섹션 */}
               <div className="mb-4">
-                <h4 className="text-lg font-bold text-gray-600 mb-1">장착 중인 아이템 ⚔️🛡️</h4>
+                <h4 className="text-lg font-bold text-gray-700 mb-1">장착 중인 아이템 ⚔️🛡️</h4>
                 <div className="flex flex-wrap gap-2 items-center">
                   {gameState.equippedWeapon && (
                     <div className="flex items-center gap-2 px-3 py-1.5 text-sm rounded-lg bg-purple-200 text-purple-800 border border-purple-300">
@@ -1522,7 +1556,7 @@ function App() {
 
               {/* 무기 */}
               <div className="mb-4">
-                <h4 className="text-lg font-bold text-gray-600 mb-1">무기 ⚔️</h4>
+                <h4 className="text-lg font-bold text-gray-700 mb-1">무기 ⚔️</h4>
                 <div className="flex flex-wrap gap-2">
                   {gameState.items.filter((item) => item.type === "weapon").length > 0 ? (
                     gameState.items
@@ -1551,7 +1585,7 @@ function App() {
 
               {/* 방어구 */}
               <div className="mb-4">
-                <h4 className="text-lg font-bold text-gray-600 mb-1">방어구 🛡️</h4>
+                <h4 className="text-lg font-bold text-gray-700 mb-1">방어구 🛡️</h4>
                 <div className="flex flex-wrap gap-2">
                   {gameState.items.filter((item) => item.type === "armor").length > 0 ? (
                     gameState.items
@@ -1580,7 +1614,7 @@ function App() {
 
               {/* 음식 */}
               <div className="mb-4">
-                <h4 className="text-lg font-bold text-gray-600 mb-1">음식 🍎</h4>
+                <h4 className="text-lg font-bold text-gray-700 mb-1">음식 🍎</h4>
                 <div className="flex flex-wrap gap-2 items-center">
                   {gameState.items.filter((item) => item.type === "food").length > 0 ? (
                     gameState.items
@@ -1609,7 +1643,7 @@ function App() {
 
               {/* 포션 */}
               <div className="mb-4">
-                <h4 className="text-lg font-bold text-gray-600 mb-1">포션 🧪</h4>
+                <h4 className="text-lg font-bold text-gray-700 mb-1">포션 🧪</h4>
                 <div className="flex flex-wrap gap-2 items-center">
                   {gameState.items.filter((item) => item.type === "potion").length > 0 ? (
                     gameState.items
@@ -1638,7 +1672,7 @@ function App() {
 
               {/* 열쇠 */}
               <div className="mb-4">
-                <h4 className="text-lg font-bold text-gray-600 mb-1">열쇠 🔑</h4>
+                <h4 className="text-lg font-bold text-gray-700 mb-1">열쇠 🔑</h4>
                 <div className="flex flex-wrap gap-2">
                   {gameState.items.filter((item) => item.type === "key").length > 0 ? (
                     gameState.items
@@ -1656,7 +1690,7 @@ function App() {
 
               {/* 책 */}
               <div className="mb-4">
-                <h4 className="text-lg font-bold text-gray-600 mb-1">책 📖</h4>
+                <h4 className="text-lg font-bold text-gray-700 mb-1">책 📖</h4>
                 <div className="flex flex-wrap gap-2">
                   {gameState.items.filter((item) => item.type === "book").length > 0 ? (
                     gameState.items
@@ -1674,7 +1708,7 @@ function App() {
 
               {/* 기타 */}
               <div>
-                <h4 className="text-lg font-bold text-gray-600 mb-1">기타 📦</h4>
+                <h4 className="text-lg font-bold text-base-content mb-1">기타 📦</h4>
                 <div className="flex flex-wrap gap-2">
                   {gameState.items.filter((item) => item.type === "misc").length > 0 ? (
                     gameState.items
@@ -1785,7 +1819,7 @@ function App() {
                   checked={withImage}
                   onChange={(e) => setWithImage(e.target.checked)}
                 />
-                <span className="text-gray-700">
+                <span className="text-base-content">
                   <span className="font-semibold block">스토리와 함께 이미지도 생성</span>
                   <span className="block text-sm text-gray-500">이미지 생성 비용이 발생할 수 있습니다.</span>
                 </span>
