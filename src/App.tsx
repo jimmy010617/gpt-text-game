@@ -346,6 +346,7 @@ function App() {
 	// 사이드바 표시 여부 관리 상태 추가 
 	const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(false);
   
+	const [isStatusVisible, setIsStatusVisible] = useState<boolean>(false);
 	const [currentSlot, setCurrentSlot] = useState<number>(1);
   const [slots, setSlots] = useState<Array<{ id: number; saved: boolean; name?: string; savedAt?: string }>>([]);
   const [saveName, setSaveName] = useState<string>("");
@@ -1465,285 +1466,289 @@ function App() {
           </div>
 
           {/* 💡 오른쪽 패널: 스탯, 설정, 소지품 */}
-          <div className="bg-white shadow-2xl rounded-2xl p-8 border border-gray-200 w-full md:w-1/3 md:min-w-[300px] flex-shrink-0 flex flex-col space-y-6">
-            <div className="flex justify-between items-center">
-              <h2 className="text-2xl font-bold text-base-content bg-base-200 px-4 py-2 rounded-lg">상태창</h2>
-              <div className="flex gap-2">
-                <button onClick={goHome} className="btn btn-outline btn-primary">
-                  처음으로
-                </button>
-                <button
-                  onClick={() => setShowOptions(true)}
-                  className="btn btn-outline btn-primary"
-                >
-                  옵션
-                </button>
-              </div>
-            </div>
+          <div className="bg-white shadow-2xl rounded-2xl p-8 border border-gray-200 w-full md:w-2/5 md:min-w-[300px] flex-shrink-0 flex flex-col space-y-6">
+						{/* 헤더: 동적 제목과 UI 전환 버튼 */}
+						<div className="flex justify-between items-center">
+							<h2 className="text-2xl font-bold text-base-content bg-base-200 px-4 py-2 rounded-lg">
+								{isStatusVisible ? "상태창" : "인벤토리"}
+							</h2>
+							<div className="flex gap-2">
+								<button
+									onClick={() => setIsStatusVisible(!isStatusVisible)}
+									className="btn btn-outline btn-primary"
+								>
+									{isStatusVisible ? "인벤토리 보기" : "상태 보기"}
+								</button>
+								<button onClick={goHome} className="btn btn-outline btn-primary">
+									처음으로
+								</button>
+								<button
+									onClick={() => setShowOptions(true)}
+									className="btn btn-outline btn-primary"
+								>
+									옵션
+								</button>
+							</div>
+						</div>
 
-            <div className="bg-gray-50 border border-gray-200 rounded-xl p-4">
-              <h3 className="font-bold text-gray-700 mb-3">현재 스탯</h3>
-              {/* 스탯 관련 JSX */}
-              <div
-                className={`flex justify-between p-1 text-gray-700 rounded-md transition-colors duration-500 border-b border-gray-200 pb-2 mb-2 ${
-                  gameState.lastDelta.hp > 0 ? "bg-red-100" : gameState.lastDelta.hp < 0 ? "bg-red-100" : ""
-                }`}
-              >
-                <span>체력(HP)</span>
-                <span className="font-semibold flex items-center justify-end w-20">
-                  {gameState.hp}
-                  <DeltaBadge value={gameState.lastDelta.hp} />
-                </span>
-              </div>
-              <div
-                className={`flex justify-between p-1 text-gray-700 rounded-md transition-colors duration-500 border-b border-gray-200 pb-2 mb-2 ${
-                  gameState.lastDelta.atk > 0 ? "bg-orange-100" : gameState.lastDelta.atk < 0 ? "bg-orange-100" : ""
-                }`}
-              >
-                <span>공격력(ATK)</span>
-                <span className="font-semibold flex items-center justify-end w-20">
-                  {getAdjustedAtk()} {/* 💡 장착 무기 보너스 포함 */}
-                  <DeltaBadge value={gameState.lastDelta.atk} />
-                </span>
-              </div>
-              <div
-                className={`flex justify-between p-1 rounded-md text-gray-700 transition-colors duration-500 border-b border-gray-200 pb-2 mb-2 ${
-                  gameState.lastDelta.mp > 0 ? "bg-blue-100" : gameState.lastDelta.mp < 0 ? "bg-blue-100" : ""
-                }`}
-              >
-                <span>마력(MP)</span>
-                <span className="font-semibold flex items-center justify-end w-20">
-                  {gameState.mp}
-                  <DeltaBadge value={gameState.lastDelta.mp} />
-                </span>
-              </div>
-              <div
-                className={`flex justify-between p-1 rounded-md text-gray-700 transition-colors duration-500 border-b border-gray-200 pb-2 mb-2 ${
-                  gameState.lastSurvivalTurn ? "bg-purple-100" : ""
-                }`}
-              >
-                <span>생존 턴</span>
-                <span className="font-semibold">{gameState.survivalTurns}</span>
-              </div>
-              {!!gameState.hudNotes.length && (
-                <div className="mt-3">
-                  <div className="text-sm font-semibold text-base-content mb-1">최근 변화</div>
-                  <ul className="list-disc list-inside text-sm text-gray-700 space-y-0.5">
-                    {gameState.hudNotes.map((n, i) => (
-                      <li key={i}>{n}</li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-            </div>
+						<div className="min-h-[700px]">
+							{/* isStatusVisible 값에 따라 상태창 또는 소지품을 표시 */}
+							{isStatusVisible ? (
+								/* ===== 상태창 UI ===== */
+								<div className="bg-gray-50 border border-gray-200 rounded-xl p-4">
+									<h3 className="font-bold text-gray-700 mb-3">현재 스탯</h3>
+									<div
+										className={`flex justify-between p-1 text-gray-700 rounded-md transition-colors duration-500 border-b border-gray-200 pb-2 mb-2 ${
+											gameState.lastDelta.hp > 0 ? "bg-red-100" : gameState.lastDelta.hp < 0 ? "bg-red-100" : ""
+										}`}
+									>
+										<span>체력(HP)</span>
+										<span className="font-semibold flex items-center justify-end w-20">
+											{gameState.hp}
+											<DeltaBadge value={gameState.lastDelta.hp} />
+										</span>
+									</div>
+									<div
+										className={`flex justify-between p-1 text-gray-700 rounded-md transition-colors duration-500 border-b border-gray-200 pb-2 mb-2 ${
+											gameState.lastDelta.atk > 0 ? "bg-orange-100" : gameState.lastDelta.atk < 0 ? "bg-orange-100" : ""
+										}`}
+									>
+										<span>공격력(ATK)</span>
+										<span className="font-semibold flex items-center justify-end w-20">
+											{getAdjustedAtk()}
+											<DeltaBadge value={gameState.lastDelta.atk} />
+										</span>
+									</div>
+									<div
+										className={`flex justify-between p-1 rounded-md text-gray-700 transition-colors duration-500 border-b border-gray-200 pb-2 mb-2 ${
+											gameState.lastDelta.mp > 0 ? "bg-blue-100" : gameState.lastDelta.mp < 0 ? "bg-blue-100" : ""
+										}`}
+									>
+										<span>마력(MP)</span>
+										<span className="font-semibold flex items-center justify-end w-20">
+											{gameState.mp}
+											<DeltaBadge value={gameState.lastDelta.mp} />
+										</span>
+									</div>
+									<div
+										className={`flex justify-between p-1 rounded-md text-gray-700 transition-colors duration-500 border-b border-gray-200 pb-2 mb-2 ${
+											gameState.lastSurvivalTurn ? "bg-purple-100" : ""
+										}`}
+									>
+										<span>생존 턴</span>
+										<span className="font-semibold">{gameState.survivalTurns}</span>
+									</div>
+									{!!gameState.hudNotes.length && (
+										<div className="mt-3">
+											<div className="text-sm font-semibold text-base-content mb-1">최근 변화</div>
+											<ul className="list-disc list-inside text-sm text-gray-700 space-y-0.5">
+												{gameState.hudNotes.map((n, i) => (
+													<li key={i}>{n}</li>
+												))}
+											</ul>
+										</div>
+									)}
+								</div>
+							) : (
+								/* ===== 소지품 UI ===== */
+								<div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+									<div className="mb-4">
+										<h4 className="text-lg font-bold text-gray-700 mb-1">장착 중인 아이템 ⚔️🛡️</h4>
+										<div className="flex flex-wrap gap-2 items-center">
+											{gameState.equippedWeapon && (
+												<div className="flex items-center gap-2 px-3 py-1.5 text-sm rounded-lg bg-purple-200 text-purple-800 border border-purple-300">
+													<span className="whitespace-nowrap">
+														{gameState.equippedWeapon.name} (+{gameState.equippedWeapon.atkBonus} ATK)
+													</span>
+													<button
+														onClick={() => handleUnequipItem(gameState.equippedWeapon!)}
+														className="ml-1 text-xs bg-purple-600 hover:bg-purple-700 text-white py-1 px-2 rounded-md transition-colors"
+													>
+														해제
+													</button>
+												</div>
+											)}
+											{gameState.equippedArmor && (
+												<div className="flex items-center gap-2 px-3 py-1.5 text-sm rounded-lg bg-indigo-200 text-indigo-800 border border-indigo-300">
+													<span className="whitespace-nowrap">{gameState.equippedArmor.name}</span>
+													<button
+														onClick={() => handleUnequipItem(gameState.equippedArmor!)}
+														className="ml-1 text-xs bg-indigo-600 hover:bg-indigo-700 text-white py-1 px-2 rounded-md transition-colors"
+													>
+														해제
+													</button>
+												</div>
+											)}
+											{!gameState.equippedWeapon && !gameState.equippedArmor && <span className="text-gray-500">없음</span>}
+										</div>
+									</div>
 
-            {/* 💡 추가된 소지품 컨테이너 */}
-						<h2 className="text-2xl font-bold text-base-content bg-base-200 px-4 py-1 rounded-lg">소지품</h2>
-            <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+									<div className="mb-4">
+										<h4 className="text-lg font-bold text-gray-700 mb-1">무기 ⚔️</h4>
+										<div className="flex flex-wrap gap-2">
+											{gameState.items.filter((item) => item.type === "weapon").length > 0 ? (
+												gameState.items
+													.filter((item) => item.type === "weapon")
+													.map((item, i) => (
+														<div
+															key={i}
+															className="flex items-center gap-2 px-3 py-1.5 text-sm rounded-lg bg-purple-100 text-purple-700 border border-purple-200"
+														>
+															<span className="whitespace-nowrap">
+																{item.name} {item.quantity > 1 ? `x${item.quantity}` : ""} {item.atkBonus ? `(+${item.atkBonus} ATK)` : ""}
+															</span>
+															<button
+																onClick={() => handleEquipItem(item)}
+																className="ml-1 text-xs bg-purple-600 hover:bg-purple-700 text-white py-1 px-2 rounded-md transition-colors"
+															>
+																장착
+															</button>
+														</div>
+													))
+											) : (
+												<span className="text-gray-500">없음</span>
+											)}
+										</div>
+									</div>
 
-              {/* 💡 장착 중인 아이템 섹션 */}
-              <div className="mb-4">
-                <h4 className="text-lg font-bold text-gray-700 mb-1">장착 중인 아이템 ⚔️🛡️</h4>
-                <div className="flex flex-wrap gap-2 items-center">
-                  {gameState.equippedWeapon && (
-                    <div className="flex items-center gap-2 px-3 py-1.5 text-sm rounded-lg bg-purple-200 text-purple-800 border border-purple-300">
-                      <span>
-                        {gameState.equippedWeapon.name} (+{gameState.equippedWeapon.atkBonus} ATK)
-                      </span>
-                      <button
-                        onClick={() => handleUnequipItem(gameState.equippedWeapon!)}
-                        className="ml-1 text-xs bg-purple-600 hover:bg-purple-700 text-white py-1 px-2 rounded-md transition-colors"
-                      >
-                        해제
-                      </button>
-                    </div>
-                  )}
-                  {gameState.equippedArmor && (
-                    <div className="flex items-center gap-2 px-3 py-1.5 text-sm rounded-lg bg-indigo-200 text-indigo-800 border border-indigo-300">
-                      <span>{gameState.equippedArmor.name}</span>
-                      <button
-                        onClick={() => handleUnequipItem(gameState.equippedArmor!)}
-                        className="ml-1 text-xs bg-indigo-600 hover:bg-indigo-700 text-white py-1 px-2 rounded-md transition-colors"
-                      >
-                        해제
-                      </button>
-                    </div>
-                  )}
-                  {!gameState.equippedWeapon && !gameState.equippedArmor && <span className="text-gray-500">없음</span>}
-                </div>
-              </div>
+									<div className="mb-4">
+										<h4 className="text-lg font-bold text-gray-700 mb-1">방어구 🛡️</h4>
+										<div className="flex flex-wrap gap-2">
+											{gameState.items.filter((item) => item.type === "armor").length > 0 ? (
+												gameState.items
+													.filter((item) => item.type === "armor")
+													.map((item, i) => (
+														<div
+															key={i}
+															className="flex items-center gap-2 px-3 py-1.5 text-sm rounded-lg bg-indigo-100 text-indigo-700 border border-indigo-200"
+														>
+															<span>
+																{item.name} {item.quantity > 1 ? `x${item.quantity}` : ""}
+															</span>
+															<button
+																onClick={() => handleEquipItem(item)}
+																className="ml-1 text-xs bg-indigo-600 hover:bg-indigo-700 text-white py-1 px-2 rounded-md transition-colors"
+															>
+																장착
+															</button>
+														</div>
+													))
+											) : (
+												<span className="text-gray-500">없음</span>
+											)}
+										</div>
+									</div>
 
-              {/* 무기 */}
-              <div className="mb-4">
-                <h4 className="text-lg font-bold text-gray-700 mb-1">무기 ⚔️</h4>
-                <div className="flex flex-wrap gap-2">
-                  {gameState.items.filter((item) => item.type === "weapon").length > 0 ? (
-                    gameState.items
-                      .filter((item) => item.type === "weapon")
-                      .map((item, i) => (
-                        <div
-                          key={i}
-                          className="flex items-center gap-2 px-3 py-1.5 text-sm rounded-lg bg-purple-100 text-purple-700 border border-purple-200"
-                        >
-                          <span>
-                            {item.name} {item.quantity > 1 ? `x${item.quantity}` : ""} {item.atkBonus ? `(+${item.atkBonus} ATK)` : ""}
-                          </span>
-                          <button
-                            onClick={() => handleEquipItem(item)}
-                            className="ml-1 text-xs bg-purple-600 hover:bg-purple-700 text-white py-1 px-2 rounded-md transition-colors"
-                          >
-                            장착
-                          </button>
-                        </div>
-                      ))
-                  ) : (
-                    <span className="text-gray-500">없음</span>
-                  )}
-                </div>
-              </div>
+									<div className="mb-4">
+										<h4 className="text-lg font-bold text-gray-700 mb-1">음식 🍎</h4>
+										<div className="flex flex-wrap gap-2 items-center">
+											{gameState.items.filter((item) => item.type === "food").length > 0 ? (
+												gameState.items
+													.filter((item) => item.type === "food")
+													.map((item, i) => (
+														<div
+															key={i}
+															className="flex items-center gap-2 px-3 py-1.5 text-sm rounded-lg bg-green-100 text-green-700 border border-green-200"
+														>
+															<span className="whitespace-nowrap">
+																{item.name} {item.quantity > 1 ? `x${item.quantity}` : ""}
+															</span>
+															<button
+																onClick={() => handleUseItem(item)}
+																className="ml-1 text-xs bg-green-600 hover:bg-green-700 text-white py-1 px-2 rounded-md transition-colors"
+															>
+																사용
+															</button>
+														</div>
+													))
+											) : (
+												<span className="text-gray-500">없음</span>
+											)}
+										</div>
+									</div>
 
-              {/* 방어구 */}
-              <div className="mb-4">
-                <h4 className="text-lg font-bold text-gray-700 mb-1">방어구 🛡️</h4>
-                <div className="flex flex-wrap gap-2">
-                  {gameState.items.filter((item) => item.type === "armor").length > 0 ? (
-                    gameState.items
-                      .filter((item) => item.type === "armor")
-                      .map((item, i) => (
-                        <div
-                          key={i}
-                          className="flex items-center gap-2 px-3 py-1.5 text-sm rounded-lg bg-indigo-100 text-indigo-700 border border-indigo-200"
-                        >
-                          <span>
-                            {item.name} {item.quantity > 1 ? `x${item.quantity}` : ""}
-                          </span>
-                          <button
-                            onClick={() => handleEquipItem(item)}
-                            className="ml-1 text-xs bg-indigo-600 hover:bg-indigo-700 text-white py-1 px-2 rounded-md transition-colors"
-                          >
-                            장착
-                          </button>
-                        </div>
-                      ))
-                  ) : (
-                    <span className="text-gray-500">없음</span>
-                  )}
-                </div>
-              </div>
+									<div className="mb-4">
+										<h4 className="text-lg font-bold text-gray-700 mb-1">포션 🧪</h4>
+										<div className="flex flex-wrap gap-2 items-center">
+											{gameState.items.filter((item) => item.type === "potion").length > 0 ? (
+												gameState.items
+													.filter((item) => item.type === "potion")
+													.map((item, i) => (
+														<div
+															key={i}
+															className="flex items-center gap-2 px-3 py-1.5 text-sm rounded-lg bg-red-100 text-red-700 border border-red-200"
+														>
+															<span className="whitespace-nowrap">
+																{item.name} {item.quantity > 1 ? `x${item.quantity}` : ""}
+															</span>
+															<button
+																onClick={() => handleUseItem(item)}
+																className="ml-1 text-xs bg-red-600 hover:bg-red-700 text-white py-1 px-2 rounded-md transition-colors"
+															>
+																사용
+															</button>
+														</div>
+													))
+											) : (
+												<span className="text-gray-500">없음</span>
+											)}
+										</div>
+									</div>
+									
+									<div className="mb-4">
+										<h4 className="text-lg font-bold text-gray-700 mb-1">열쇠 🔑</h4>
+										<div className="flex flex-wrap gap-2">
+											{gameState.items.filter((item) => item.type === "key").length > 0 ? (
+												gameState.items
+													.filter((item) => item.type === "key")
+													.map((item, i) => (
+														<span key={i} className="px-3 py-1.5 text-sm rounded-lg bg-yellow-100 text-yellow-700 border border-yellow-200">
+															{item.name} {item.quantity > 1 ? `x${item.quantity}` : ""}
+														</span>
+													))
+											) : (
+												<span className="text-gray-500">없음</span>
+											)}
+										</div>
+									</div>
 
-              {/* 음식 */}
-              <div className="mb-4">
-                <h4 className="text-lg font-bold text-gray-700 mb-1">음식 🍎</h4>
-                <div className="flex flex-wrap gap-2 items-center">
-                  {gameState.items.filter((item) => item.type === "food").length > 0 ? (
-                    gameState.items
-                      .filter((item) => item.type === "food")
-                      .map((item, i) => (
-                        <div
-                          key={i}
-                          className="flex items-center gap-2 px-3 py-1.5 text-sm rounded-lg bg-green-100 text-green-700 border border-green-200"
-                        >
-                          <span>
-                            {item.name} {item.quantity > 1 ? `x${item.quantity}` : ""}
-                          </span>
-                          <button
-                            onClick={() => handleUseItem(item)}
-                            className="ml-1 text-xs bg-green-600 hover:bg-green-700 text-white py-1 px-2 rounded-md transition-colors"
-                          >
-                            사용
-                          </button>
-                        </div>
-                      ))
-                  ) : (
-                    <span className="text-gray-500">없음</span>
-                  )}
-                </div>
-              </div>
+									<div className="mb-4">
+										<h4 className="text-lg font-bold text-gray-700 mb-1">책 📖</h4>
+										<div className="flex flex-wrap gap-2">
+											{gameState.items.filter((item) => item.type === "book").length > 0 ? (
+												gameState.items
+													.filter((item) => item.type === "book")
+													.map((item, i) => (
+														<span key={i} className="px-3 py-1.5 text-sm rounded-lg bg-cyan-100 text-cyan-700 border border-cyan-200">
+															{item.name} {item.quantity > 1 ? `x${item.quantity}` : ""}
+														</span>
+													))
+											) : (
+												<span className="text-gray-500">없음</span>
+											)}
+										</div>
+									</div>
 
-              {/* 포션 */}
-              <div className="mb-4">
-                <h4 className="text-lg font-bold text-gray-700 mb-1">포션 🧪</h4>
-                <div className="flex flex-wrap gap-2 items-center">
-                  {gameState.items.filter((item) => item.type === "potion").length > 0 ? (
-                    gameState.items
-                      .filter((item) => item.type === "potion")
-                      .map((item, i) => (
-                        <div
-                          key={i}
-                          className="flex items-center gap-2 px-3 py-1.5 text-sm rounded-lg bg-red-100 text-red-700 border border-red-200"
-                        >
-                          <span>
-                            {item.name} {item.quantity > 1 ? `x${item.quantity}` : ""}
-                          </span>
-                          <button
-                            onClick={() => handleUseItem(item)}
-                            className="ml-1 text-xs bg-red-600 hover:bg-red-700 text-white py-1 px-2 rounded-md transition-colors"
-                          >
-                            사용
-                          </button>
-                        </div>
-                      ))
-                  ) : (
-                    <span className="text-gray-500">없음</span>
-                  )}
-                </div>
-              </div>
-
-              {/* 열쇠 */}
-              <div className="mb-4">
-                <h4 className="text-lg font-bold text-gray-700 mb-1">열쇠 🔑</h4>
-                <div className="flex flex-wrap gap-2">
-                  {gameState.items.filter((item) => item.type === "key").length > 0 ? (
-                    gameState.items
-                      .filter((item) => item.type === "key")
-                      .map((item, i) => (
-                        <span key={i} className="px-3 py-1.5 text-sm rounded-lg bg-yellow-100 text-yellow-700 border border-yellow-200">
-                          {item.name} {item.quantity > 1 ? `x${item.quantity}` : ""}
-                        </span>
-                      ))
-                  ) : (
-                    <span className="text-gray-500">없음</span>
-                  )}
-                </div>
-              </div>
-
-              {/* 책 */}
-              <div className="mb-4">
-                <h4 className="text-lg font-bold text-gray-700 mb-1">책 📖</h4>
-                <div className="flex flex-wrap gap-2">
-                  {gameState.items.filter((item) => item.type === "book").length > 0 ? (
-                    gameState.items
-                      .filter((item) => item.type === "book")
-                      .map((item, i) => (
-                        <span key={i} className="px-3 py-1.5 text-sm rounded-lg bg-cyan-100 text-cyan-700 border border-cyan-200">
-                          {item.name} {item.quantity > 1 ? `x${item.quantity}` : ""}
-                        </span>
-                      ))
-                  ) : (
-                    <span className="text-gray-500">없음</span>
-                  )}
-                </div>
-              </div>
-
-              {/* 기타 */}
-              <div>
-                <h4 className="text-lg font-bold text-gray-700 mb-1">기타 📦</h4>
-                <div className="flex flex-wrap gap-2">
-                  {gameState.items.filter((item) => item.type === "misc").length > 0 ? (
-                    gameState.items
-                      .filter((item) => item.type === "misc")
-                      .map((item, i) => (
-                        <span key={i} className="px-3 py-1.5 text-sm rounded-lg bg-gray-200 text-gray-800 border border-gray-300">
-                          {item.name} {item.quantity > 1 ? `x${item.quantity}` : ""}
-                        </span>
-                      ))
-                  ) : (
-                    <span className="text-gray-500">없음</span>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
+									<div>
+										<h4 className="text-lg font-bold text-gray-700 mb-1">기타 📦</h4>
+										<div className="flex flex-wrap gap-2">
+											{gameState.items.filter((item) => item.type === "misc").length > 0 ? (
+												gameState.items
+													.filter((item) => item.type === "misc")
+													.map((item, i) => (
+														<span key={i} className="px-3 py-1.5 text-sm rounded-lg bg-gray-200 text-gray-800 border border-gray-300">
+															{item.name} {item.quantity > 1 ? `x${item.quantity}` : ""}
+														</span>
+													))
+											) : (
+												<span className="text-gray-500">없음</span>
+											)}
+										</div>
+									</div>
+								</div>
+							)}
+						</div>
+					</div>
         </div>
       )}
 
