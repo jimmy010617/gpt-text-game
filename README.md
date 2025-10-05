@@ -18,9 +18,14 @@
 - 사용 API : Google Gemini, Imagen 3
 
 ### 🖥 프로젝트 설명
-<img width="1728" height="920" alt="Image" src="https://github.com/user-attachments/assets/0142250d-f9c9-42b0-939e-765aa713a226" />
-<img width="1728" height="920" alt="Image" src="https://github.com/user-attachments/assets/ff0dab21-4e9d-420d-ae67-b784219e01f2" />
-<img width="1728" height="920" alt="Image" src="https://github.com/user-attachments/assets/fb875581-20cf-4f7c-abe4-6f585f924448" />
-<img width="1728" height="920" alt="Image" src="https://github.com/user-attachments/assets/2553bc70-163c-4d40-8648-0a6bccc52638" />
-<img width="1728" height="920" alt="Image" src="https://github.com/user-attachments/assets/4bcced2b-0a15-45c2-8a62-1f40081eb31f" />
 <img width="1728" height="920" alt="Image" src="https://github.com/user-attachments/assets/d4b12f05-2abe-472f-be24-f26170b0ab67" />
+
+<img width="1728" height="920" alt="Image" src="https://github.com/user-attachments/assets/0142250d-f9c9-42b0-939e-765aa713a226" />
+
+<img width="1728" height="920" alt="Image" src="https://github.com/user-attachments/assets/ff0dab21-4e9d-420d-ae67-b784219e01f2" />
+
+<img width="1728" height="920" alt="Image" src="https://github.com/user-attachments/assets/fb875581-20cf-4f7c-abe4-6f585f924448" />
+
+<img width="1728" height="920" alt="Image" src="https://github.com/user-attachments/assets/2553bc70-163c-4d40-8648-0a6bccc52638" />
+
+<img width="1728" height="920" alt="Image" src="https://github.com/user-attachments/assets/4bcced2b-0a15-45c2-8a62-1f40081eb31f" />
