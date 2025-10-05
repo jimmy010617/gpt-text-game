@@ -1245,7 +1245,7 @@ function App() {
         // ===== 게임 시작 전 UI =====
         <div className="bg-white shadow-2xl rounded-2xl w-full max-w-4xl p-8 space-y-6 border border-gray-200">
           <div className="flex items-center justify-between">
-            <h1 className="text-4xl font-extrabold text-primary">AI Text Adventure Game</h1>
+            <h1 className="text-4xl font-extrabold text-primary">랜덤 스토리</h1>
             <div className="flex items-center gap-3">
               <button onClick={() => setShowOptions(true)} className="btn btn-outline btn-primary btn-md">
                 설정
@@ -1404,7 +1404,7 @@ function App() {
                   <button
                     type="submit"
                     disabled={!gameState.isTypingFinished || gameState.isTextLoading || !gameState.userAction}
-                    className="btn btn-outline btn-primary"
+                    className="btn btn-outline btn-primary disabled:border-gray-700 disabled:text-gray-500"
                   >
                     {gameState.isTextLoading ? "로딩 중..." : "다음 이야기 진행"}
                   </button>
@@ -1708,7 +1708,7 @@ function App() {
 
               {/* 기타 */}
               <div>
-                <h4 className="text-lg font-bold text-base-content mb-1">기타 📦</h4>
+                <h4 className="text-lg font-bold text-gray-700 mb-1">기타 📦</h4>
                 <div className="flex flex-wrap gap-2">
                   {gameState.items.filter((item) => item.type === "misc").length > 0 ? (
                     gameState.items
@@ -1728,14 +1728,14 @@ function App() {
         </div>
       )}
 
-      {/* 기존 모달들 */}
+      {/* 게임 설정 코드 */}
       {showOptions && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
           <div className="absolute inset-0 bg-black/40" onClick={() => setShowOptions(false)} aria-hidden="true" />
           <div className="relative bg-white w-full max-w-md mx-4 rounded-2xl shadow-xl border border-gray-200 p-8 max-h-5/6 overflow-y-auto">
             <h2 className="text-3xl font-extrabold text-purple-700 text-center mb-6">게임 설정</h2>
             {/* ===== 장르 설정 ===== */}
-            <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-6">
+            <div className="bg-gray-50 border text-gray-700 border-gray-200 rounded-lg p-4 mb-6">
               <h3 className="font-bold text-gray-700 mb-3">장르 설정</h3>
 
               {/* 모드 */}
@@ -1810,6 +1810,8 @@ function App() {
                 </button>
               </div>
             </div>
+
+						{/* ===== 스토리 생성 설정 ===== */}
             <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-6">
               <h3 className="font-bold text-gray-700 mb-3">스토리 생성 설정</h3>
               <label className="flex items-center gap-3 select-none">
@@ -1819,7 +1821,7 @@ function App() {
                   checked={withImage}
                   onChange={(e) => setWithImage(e.target.checked)}
                 />
-                <span className="text-base-content">
+                <span className="text-gray-600">
                   <span className="font-semibold block">스토리와 함께 이미지도 생성</span>
                   <span className="block text-sm text-gray-500">이미지 생성 비용이 발생할 수 있습니다.</span>
                 </span>
@@ -1827,7 +1829,7 @@ function App() {
             </div>
 
             {/* {스탯 설정 슬라이더} */}
-            <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-6">
+            <div className="bg-gray-50 border text-gray-600 border-gray-200 rounded-lg p-4 mb-6">
               <h3 className="font-bold text-gray-700 mb-3">초기 스탯 설정</h3>
               <div className="space-y-4">
                 <div>
@@ -1894,7 +1896,8 @@ function App() {
               </div>
             </div>
 
-            <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-6">
+						{/* 최대 턴 설정 */}
+            <div className="bg-gray-50 border text-gray-700 border-gray-200 rounded-lg p-4 mb-6">
               <h3 className="font-bold text-gray-700 mb-3">최대 턴 설정</h3>
               <div className="flex items-center gap-3">
                 <input
@@ -1921,6 +1924,7 @@ function App() {
               </div>
             </div>
 
+						{/* 게임 저장/불러오기 */}
             <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
               <h3 className="font-bold text-gray-700 mb-3">게임 저장/불러오기</h3>
 
@@ -1962,7 +1966,7 @@ function App() {
                   value={saveName}
                   onChange={(e) => setSaveName(e.target.value)}
                   placeholder="이름이나 설명을 입력하세요"
-                  className="w-full p-2 border border-gray-300 rounded-lg text-sm"
+                  className="w-full p-2 border border-gray-300 rounded-lg text-sm text-gray-600"
                 />
               </div>
 
@@ -2015,6 +2019,7 @@ function App() {
           </div>
         </div>
       )}
+			{/* 게임 설정 코드 종료 */}
     </div>
   );
 }
