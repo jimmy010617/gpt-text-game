@@ -4,6 +4,10 @@ import { GoogleGenAI } from "@google/genai";
 
 import SideBar from "./Layout/SideBar";
 
+// 🎵 음악
+import BgmPlayer from "./MusicPlayer/BgmPlayer"; // 🎵 BGM 플레이어 컴포넌트 import
+import { BGM_MAP, BGM_MOODS } from "./Audio/audioConfig"; // 🎵 BGM 설정 import
+
 // 🔑 ENV
 const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY as
   | string
@@ -205,6 +209,7 @@ type GameState = {
   isRunComplete: boolean; // 최대 턴 도달로 러닝 종료
   achievements: string[]; // 업적 목록
   ending: string; // 엔딩 서사(문단)
+	currentBgm: string | null; // 🎵 BGM 상태 추가
 };
 
 type AskResult = {
@@ -215,6 +220,7 @@ type AskResult = {
   itemsRemove: string[];
   notes: string[];
   recommendedAction: string;
+	bgmMood: string | null; // 🎵 BGM 무드 추가
 };
 
 // ===== 유틸: 아이템 종류 분류 (하드코딩된 목록) =====
@@ -297,6 +303,7 @@ const DEFAULT_INITIAL_STATE: GameState = {
   isRunComplete: false,
   achievements: [],
   ending: "",
+	currentBgm: null, // 🎵 BGM 상태 추가
 };
 
 // ===== 유틸: 초기 상태 불러오기 =====
@@ -340,6 +347,7 @@ const loadInitialState = (): GameState => {
         isRunComplete: loadedState.isRunComplete ?? false,
         achievements: loadedState.achievements ?? [],
         ending: loadedState.ending ?? "",
+				currentBgm: loadedState.currentBgm ?? null, // 🎵 BGM 상태 불러오기
       };
     }
   } catch (e) {
@@ -695,6 +703,7 @@ function App() {
       isRunComplete,
       achievements,
       ending,
+			currentBgm, // 🎵 BGM 상태 추가
     } = gameState;
 
     const autoSaveState = {
@@ -716,6 +725,7 @@ function App() {
       isRunComplete,
       achievements,
       ending, // 🔸
+			currentBgm, // 🎵 BGM 상태 추가
     };
     try {
       localStorage.setItem("ai_game_auto_save", JSON.stringify(autoSaveState));
@@ -819,13 +829,18 @@ function App() {
       "스탯은 정수 delta로만 표기(hp/atk/mp). 예: 괴물과 싸움→ atk+1, hp-10 / 책 읽음→ mp+1 / 피해→ hp-10. " +
       "아이템 변동이 있으면 itemsAdd/itemsRemove에 넣으세요. " +
       "또한 장면에서 '가장 중심이 되는 단일 물체' 1개(subject)를 뽑습니다(사람/군중/배경전체/추상 제외). " +
-      "사용자의 행동을 직접 입력하지 않고 클릭할 수 있도록 'recommendedAction'에 다음 추천 행동 1개를 한국어 문장으로 제시하세요. " +
+      // 🎵 BGM 프롬프트 시작
+      `마지막으로, 생성된 스토리의 분위기에 가장 잘 어울리는 BGM 무드를 다음 목록에서 하나만 골라 'bgmMood' 필드에 추가하세요: [${BGM_MOODS.join(
+        ", "
+      )}]. 목록에 없으면 'calm'이나 'tense' 중 가장 가까운 것을 선택하고, 애매하면 null. ` +
+			"사용자의 행동을 직접 입력하지 않고 클릭할 수 있도록 'recommendedAction'에 다음 추천 행동 1개를 한국어 문장으로 제시하세요. " +
       "가능하면 가장 합리적인 행동을 추천하고, 너무 뻔한 행동은 피하세요.\n" +
       "반드시 JSON만 출력. 포맷:\n" +
       "{\n" +
       '  "story": "한국어 스토리...",\n' +
       '  "subject": { "언어": "물체", "en": "subject" },\n' +
-      '  "deltas": [ { "stat": "hp"|"atk"|"mp", "delta": -10, "reason": "적에게 맞음" }, ... ],\n' +
+      '  "bgmMood": "tense" | "calm" | "combat" | ... | null,\n' + // 🎵 BGM 필드 추가
+			'  "deltas": [ { "stat": "hp"|"atk"|"mp", "delta": -10, "reason": "적에게 맞음" }, ... ],\n' +
       '  "itemsAdd": ["아이템명"...],\n' +
       '  "itemsRemove": ["아이템명"...],\n' +
       '  "recommendedAction": "추천 행동 텍스트"\n' +
@@ -874,6 +889,7 @@ function App() {
       ? parsed.hudNotes
       : [];
     const recommendedAction: string = (parsed.recommendedAction ?? "").trim();
+		const bgmMood: string | null = (parsed.bgmMood ?? null) as string | null; // 🎵 BGM 무드 추출
 
     return {
       nextStory,
@@ -883,6 +899,7 @@ function App() {
       itemsRemove,
       notes,
       recommendedAction,
+			bgmMood, // 🎵 BGM 무드 반환
     };
   }
 
@@ -1100,6 +1117,7 @@ function App() {
       isRunComplete: false,
       achievements: [],
       ending: "",
+			currentBgm: null, // 🎵 BGM 초기화
     }));
 
     const { genreText } = buildGenreDirectivesForPrompt(
@@ -1121,6 +1139,7 @@ function App() {
         itemsAdd,
         itemsRemove,
         recommendedAction,
+				bgmMood, // 🎵 BGM 무드 받기
       } = await askStorySubjectAndDeltas({
         systemHint:
           "story는 자연스러운 한국어 문단. subject는 단일 물체 1개만. " +
@@ -1129,11 +1148,15 @@ function App() {
         userText: chatPrompt,
       });
 
+			// 🎵 BGM URL 찾기 (시작이므로 없으면 default)
+      const newBgmUrl = (bgmMood && BGM_MAP[bgmMood]) || BGM_MAP["default"];
+
       const out = nextStory || "상황 생성 실패";
       setGameState((prev) => ({
         ...prev,
         story: out,
         recommendedAction: recommendedAction || "",
+				currentBgm: newBgmUrl, // 🎵 BGM 상태 업데이트
       }));
       applyDeltasAndItems({ deltas, itemsAdd, itemsRemove });
       autoSaveGame();
@@ -1186,6 +1209,7 @@ function App() {
         itemsAdd,
         itemsRemove,
         recommendedAction,
+				bgmMood, // 🎵 BGM 무드 받기
       } = await askStorySubjectAndDeltas({
         systemHint:
           "story는 한국어 문단. subject는 단일 물체 1개. " +
@@ -1193,6 +1217,9 @@ function App() {
           "스탯이 높거나 낮으면 결과가 달라지도록. itemsAdd/Remove도 필요시 채움.",
         userText: actionPrompt,
       });
+
+			// 🎵 BGM URL 찾기 (AI가 새 무드를 제안한 경우)
+      const newBgmUrl = bgmMood && BGM_MAP[bgmMood]; // 🎵 있으면 URL, 없으면 undefined
 
       const out = nextStory || "이야기 생성 실패";
       setGameState((prev) => ({
@@ -1202,6 +1229,8 @@ function App() {
         recommendedAction: recommendedAction || "",
         // 순환 모드에서도 selectedGenreId는 그대로 두고, turnInRun만 증가
         turnInRun: nextTurn,
+				// 🎵 새 BGM URL이 있으면 적용, 없으면 (undefined) 기존 BGM 유지
+        currentBgm: newBgmUrl || prev.currentBgm,
       }));
       applyDeltasAndItems({ deltas, itemsAdd, itemsRemove });
       autoSaveGame();
@@ -1283,6 +1312,7 @@ function App() {
       isRunComplete,
       achievements,
       ending,
+			currentBgm, // 🎵 BGM 상태 추가
     } = gameState; // 🔸
     const saveState = {
       story,
@@ -1298,6 +1328,7 @@ function App() {
       isRunComplete,
       achievements,
       ending, // 🔸
+			currentBgm, // 🎵 BGM 상태 추가
       name: name || `저장 #${slotNumber}`,
       savedAt: new Date().toLocaleString(),
     };
@@ -1350,6 +1381,7 @@ function App() {
     turnInRun?: number;
     recommendedAction?: string;
     isGameOver?: boolean;
+		currentBgm?: string | null; // 🎵 BGM 상태 추가
   };
   // 👉 저장 슬롯에서 불러올 때 사용할 타입
 
@@ -1406,6 +1438,8 @@ function App() {
         selectedGenreId: loaded.selectedGenreId ?? prev.selectedGenreId ?? null,
         genreMode:
           (loaded.genreMode as GenreMode) ?? prev.genreMode ?? "random-run",
+
+				currentBgm: loaded.currentBgm ?? null, // 🎵 BGM 상태 불러오기
       }));
 
       setSaveName(loaded.name || "");
@@ -1445,7 +1479,11 @@ function App() {
 
   return (
     <div className="min-h-screen bg-base-200 p-6 flex flex-col items-center justify-center">
-      {/* ===== 🔽 2. 사이드바 토글 버튼 추가 🔽 ===== */}
+      {/* 🎵 BGM 플레이어 렌더링 */}
+      {/* 이 컴포넌트는 UI에 버튼만 표시하고, 실제 로직을 모두 담당합니다. */}
+      <BgmPlayer src={gameState.currentBgm} />
+			
+			{/* ===== 🔽 2. 사이드바 토글 버튼 추가 🔽 ===== */}
       <button
         onClick={() => setIsSidebarOpen(true)}
         className="fixed top-6 left-6 z-50 bg-base-100 p-4 rounded-full shadow-lg hover:bg-base-200 transition-colors"
