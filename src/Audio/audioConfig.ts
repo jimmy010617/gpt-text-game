@@ -5,13 +5,13 @@
  * (예: public/music/ambient-main.mp3, public/music/explore-calm.mp3 등)
  */
 export const BGM_MAP: { [key: string]: string } = {
-  default: "/music/ambient-main.mp3", // 기본 브금
-  calm: "/music/explore-calm.mp3", // 탐험, 안정
-  tense: "/music/action-tense.mp3", // 긴장, 추격
-  combat: "/music/battle-epic.mp3", // 전투
-  horror: "/music/horror-drone.mp3", // 공포, 폐쇄
-  discovery: "/music/discovery-wonder.mp3", // 발견, 신비
-  sad: "/music/sad-theme.mp3", // 슬픔, 상실
+  default: "/Audio/bgm/default1.mp3", // 기본 브금
+  calm: "/Audio/bgm/calm1.mp3", // 탐험, 안정
+  tense: "/Audio/bgm/tense1.mp3", // 긴장, 추격
+  combat: "/Audio/bgm/combat1.mp3", // 전투
+  horror: "/Audio/bgm/horror1.mp3", // 공포, 폐쇄
+  discovery: "/Audio/bgm/discovery1.mp3", // 발견, 신비
+  sad: "/Audio/bgm/sad1.mp3", // 슬픔, 상실
 };
 
 /**
