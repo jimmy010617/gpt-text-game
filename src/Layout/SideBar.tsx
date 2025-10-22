@@ -34,12 +34,26 @@ const SideBar = () => {
     "winter",
   ];
 
+	// localStorage에서 초기 테마 값 불러오기
+  // 컴포넌트가 처음 로드될 때 localStorage에서 'theme' 값을 읽음.
+  // 값이 없으면 'light'를 기본값으로 사용.
+	const getInitialTheme = () => {
+    if (typeof window !== 'undefined') {
+      const savedTheme = window.localStorage.getItem('theme');
+      return savedTheme || 'light'; // 저장된 값이 있으면 사용, 없으면 'light'
+    }
+    return 'light'; // 서버 사이드에서는 기본값 반환
+  };
+
   // 현재 선택된 테마를 관리하는 상태, 기본값은 'light'
-  const [currentTheme, setCurrentTheme] = useState('light');
+  const [currentTheme, setCurrentTheme] = useState(getInitialTheme);
 
   // 컴포넌트가 마운트되거나 currentTheme가 변경될 때마다 HTML 최상위 요소에 'data-theme' 속성을 설정
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', currentTheme);
+
+		// 변경된 테마를 localStorage에 저장
+    window.localStorage.setItem('theme', currentTheme);
   }, [currentTheme]);
 
   return (

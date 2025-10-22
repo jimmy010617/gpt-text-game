@@ -22,8 +22,6 @@ import {
 import { BGM_MAP, BGM_MOODS } from "../Audio/audioConfig";
 
 // ===== 유틸: 아이템 종류 분류 (하드코딩된 목록) =====
-// [!code focus start]
-// 🔽 로직 채워넣기
 const categorizeItem = (name: string): ItemType => {
   const normalizedName = name.trim().toLowerCase();
   if (
@@ -69,11 +67,8 @@ const categorizeItem = (name: string): ItemType => {
   }
   return "misc";
 };
-// [!code focus end]
 
 // ===== 유틸: 초기 상태 불러오기 =====
-// [!code focus start]
-// 🔽 로직 채워넣기
 const loadInitialState = (): GameState => {
   try {
     const autoSavedState = localStorage.getItem("ai_game_auto_save");
@@ -122,15 +117,12 @@ const loadInitialState = (): GameState => {
   }
   return DEFAULT_INITIAL_STATE;
 };
-// [!code focus end]
 
 // ===== 장르 헬퍼 =====
 const getGenreById = (id?: string | null) =>
   GENRES.find((g) => g.id === id) || null;
 const pickRandomGenre = () => GENRES[Math.floor(Math.random() * GENRES.length)];
 
-// [!code focus start]
-// 🔽 로직 채워넣기
 function buildGenreDirectivesForPrompt(
   mode: GenreMode,
   selectedId: string | null | undefined,
@@ -165,7 +157,6 @@ function buildGenreDirectivesForPrompt(
 
   return { activeGenre: active, genreText };
 }
-// [!code focus end]
 
 // ===== 훅 정의 =====
 export const useGame = (withImage: boolean) => {
@@ -187,8 +178,6 @@ export const useGame = (withImage: boolean) => {
     return gameState.atk + (gameState.equippedWeapon?.atkBonus || 0);
   }, [gameState.atk, gameState.equippedWeapon]);
 
-  // [!code focus start]
-  // 🔽 로직 채워넣기 + useCallback
   const computeAchievements = useCallback((s: GameState): string[] => {
     const a: string[] = [];
     if (s.hp >= 100) a.push("철인: 체력을 100 이상 유지했다");
@@ -203,10 +192,7 @@ export const useGame = (withImage: boolean) => {
     if (a.length === 0) a.push("소소한 생존자: 평범하지만 꾸준히 버텼다");
     return a.slice(0, 6);
   }, []);
-  // [!code focus end]
-
-  // [!code focus start]
-  // 🔽 로직 채워넣기 + useCallback
+  
   const generateEndingNarrative = useCallback(
     async (s: GameState, genreText: string): Promise<string> => {
       if (!ai) {
@@ -245,10 +231,7 @@ export const useGame = (withImage: boolean) => {
     },
     [ai]
   ); // getAdjustedAtk는 s.atk를 사용하므로 의존성 필요 없음
-  // [!code focus end]
-
-  // [!code focus start]
-  // 🔽 로직 채워넣기 (useCallback은 이미 적용됨)
+  
   const handleUseItem = useCallback((itemToUse: Item) => {
     if (!window.confirm(`${itemToUse.name}을(를) 사용하시겠습니까?`)) {
       return;
@@ -286,10 +269,7 @@ export const useGame = (withImage: boolean) => {
       };
     });
   }, []);
-  // [!code focus end]
-
-  // [!code focus start]
-  // 🔽 로직 채워넣기 (useCallback은 이미 적용됨)
+  
   const handleEquipItem = useCallback((itemToEquip: Item) => {
     if (itemToEquip.type !== "weapon" && itemToEquip.type !== "armor") {
       alert("장착할 수 없는 아이템입니다.");
@@ -348,10 +328,7 @@ export const useGame = (withImage: boolean) => {
       };
     });
   }, []);
-  // [!code focus end]
-
-  // [!code focus start]
-  // 🔽 로직 채워넣기 (useCallback은 이미 적용됨)
+  
   const handleUnequipItem = useCallback((itemToUnequip: Item) => {
     setGameState((prev) => {
       let newItems = [...prev.items];
@@ -392,10 +369,7 @@ export const useGame = (withImage: boolean) => {
       };
     });
   }, []);
-  // [!code focus end]
-
-  // [!code focus start]
-  // 🔽 로직 채워넣기 (useCallback은 이미 적용됨)
+  
   const autoSaveGame = useCallback(() => {
     const {
       story,
@@ -447,10 +421,7 @@ export const useGame = (withImage: boolean) => {
       console.error("자동 저장 실패:", e);
     }
   }, [gameState]);
-  // [!code focus end]
-
-  // [!code focus start]
-  // 🔽 로직 채워넣기 + useCallback
+  
   const ensureApi = useCallback((): boolean => {
     if (!ai) {
       setGameState((prev) => ({
@@ -461,10 +432,7 @@ export const useGame = (withImage: boolean) => {
     }
     return true;
   }, [ai]);
-  // [!code focus end]
-
-  // [!code focus start]
-  // 🔽 로직 채워넣기 + useCallback
+  
   const buildImagePromptFromSubject = useCallback(
     (subject: Subject | null | undefined): string => {
       const ko = subject?.ko?.trim() || "핵심 오브젝트 1개";
@@ -486,10 +454,7 @@ export const useGame = (withImage: boolean) => {
     },
     []
   );
-  // [!code focus end]
-
-  // [!code focus start]
-  // 🔽 로직 채워넣기 + useCallback
+  
   const askStorySubjectAndDeltas = useCallback(
     async ({
       systemHint,
@@ -595,10 +560,7 @@ export const useGame = (withImage: boolean) => {
     },
     [ai, gameState, getAdjustedAtk]
   ); // gameState가 바뀌면 playerState도 바뀌어야 하므로 의존성 추가
-  // [!code focus end]
-
-  // [!code focus start]
-  // 🔽 로직 채워넣기 + useCallback
+  
   const generateSceneImageFromSubject = useCallback(
     async (subject: Subject | null) => {
       setGameState((prev) => ({ ...prev, imgError: "", isImgLoading: true }));
@@ -648,10 +610,7 @@ export const useGame = (withImage: boolean) => {
     },
     [ai, ensureApi, buildImagePromptFromSubject]
   );
-  // [!code focus end]
-
-  // [!code focus start]
-  // 🔽 로직 채워넣기 + useCallback
+  
   const generateHudNotes = useCallback(
     ({
       deltas,
@@ -686,10 +645,7 @@ export const useGame = (withImage: boolean) => {
     },
     []
   );
-  // [!code focus end]
-
-  // [!code focus start]
-  // 🔽 로직 채워넣기 + useCallback
+  
   const applyDeltasAndItems = useCallback(
     ({
       deltas,
@@ -790,13 +746,10 @@ export const useGame = (withImage: boolean) => {
     },
     [generateHudNotes]
   ); // categorizeItem은 top-level 함수라 의존성 필요 없음
-  // [!code focus end]
 
   // ===== 이펙트 훅 =====
 
   // 🔸 최대 턴 도달 시 엔딩
-  // [!code focus start]
-  // 🔽 로직 채워넣기 + 의존성 수정
   useEffect(() => {
     (async () => {
       if (!gameState.isRunComplete || gameState.ending) return;
@@ -837,7 +790,6 @@ export const useGame = (withImage: boolean) => {
     generateEndingNarrative,
     autoSaveGame,
   ]);
-  // [!code focus end]
 
   // 타이핑 효과
   useEffect(() => {
@@ -875,8 +827,6 @@ export const useGame = (withImage: boolean) => {
 
   // ===== 핵심 핸들러 (useCallback) =====
 
-  // [!code focus start]
-  // 🔽 로직 채워넣기 + useCallback
   const generateScenario = useCallback(async () => {
     if (!ensureApi()) return;
 
@@ -989,10 +939,7 @@ export const useGame = (withImage: boolean) => {
     withImage,
     generateSceneImageFromSubject,
   ]);
-  // [!code focus end]
-
-  // [!code focus start]
-  // 🔽 로직 채워넣기 + useCallback
+  
   const submitAction = useCallback(async () => {
     if (
       !ensureApi() ||
@@ -1077,10 +1024,7 @@ export const useGame = (withImage: boolean) => {
     withImage,
     generateSceneImageFromSubject,
   ]);
-  // [!code focus end]
-
-  // [!code focus start]
-  // 🔽 로직 채워넣기 + useCallback
+  
   const goHome = useCallback(() => {
     if (
       window.confirm(
@@ -1096,7 +1040,6 @@ export const useGame = (withImage: boolean) => {
       localStorage.removeItem("ai_game_auto_save");
     }
   }, [setInitialStats]); // setInitialStats는 useState의 setter라 안정적임
-  // [!code focus end]
 
   // 훅의 반환값
   return {

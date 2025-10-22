@@ -76,7 +76,8 @@ export const GameUI: React.FC<GameUIProps> = ({
         {/* 💡 스토리 텍스트 */}
         <div
           ref={storyRef}
-          className="bg-gray-100 border border-gray-300 rounded-xl p-4 text-lg text-gray-700 whitespace-pre-wrap shadow-inner overflow-y-auto max-h-[40vh] flex-grow"
+          className="bg-gray-100 border border-gray-300 rounded-xl p-4 text-lg text-gray-700 whitespace-pre-wrap shadow-inner overflow-y-auto max-h-[40vh] flex-grow font-display {
+							story"
         >
           {gameState.typingStory}
         </div>

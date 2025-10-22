@@ -1,4 +1,12 @@
+@import url('https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@200..900&display=swap');
 @import 'tailwindcss';
 @plugin 'daisyui' {
 	themes: all;
+}
+
+/* 폰트 변경 */
+@theme {
+	--font-display {
+		story: "Noto Serif KR", serif;
+	} 
 }
