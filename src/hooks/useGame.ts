@@ -192,7 +192,7 @@ export const useGame = (withImage: boolean) => {
     if (a.length === 0) a.push("소소한 생존자: 평범하지만 꾸준히 버텼다");
     return a.slice(0, 6);
   }, []);
-  
+
   const generateEndingNarrative = useCallback(
     async (s: GameState, genreText: string): Promise<string> => {
       if (!ai) {
@@ -231,7 +231,7 @@ export const useGame = (withImage: boolean) => {
     },
     [ai]
   ); // getAdjustedAtk는 s.atk를 사용하므로 의존성 필요 없음
-  
+
   const handleUseItem = useCallback((itemToUse: Item) => {
     if (!window.confirm(`${itemToUse.name}을(를) 사용하시겠습니까?`)) {
       return;
@@ -269,7 +269,7 @@ export const useGame = (withImage: boolean) => {
       };
     });
   }, []);
-  
+
   const handleEquipItem = useCallback((itemToEquip: Item) => {
     if (itemToEquip.type !== "weapon" && itemToEquip.type !== "armor") {
       alert("장착할 수 없는 아이템입니다.");
@@ -328,7 +328,7 @@ export const useGame = (withImage: boolean) => {
       };
     });
   }, []);
-  
+
   const handleUnequipItem = useCallback((itemToUnequip: Item) => {
     setGameState((prev) => {
       let newItems = [...prev.items];
@@ -369,7 +369,7 @@ export const useGame = (withImage: boolean) => {
       };
     });
   }, []);
-  
+
   const autoSaveGame = useCallback(() => {
     const {
       story,
@@ -421,7 +421,7 @@ export const useGame = (withImage: boolean) => {
       console.error("자동 저장 실패:", e);
     }
   }, [gameState]);
-  
+
   const ensureApi = useCallback((): boolean => {
     if (!ai) {
       setGameState((prev) => ({
@@ -432,7 +432,7 @@ export const useGame = (withImage: boolean) => {
     }
     return true;
   }, [ai]);
-  
+
   const buildImagePromptFromSubject = useCallback(
     (subject: Subject | null | undefined): string => {
       const ko = subject?.ko?.trim() || "핵심 오브젝트 1개";
@@ -454,7 +454,7 @@ export const useGame = (withImage: boolean) => {
     },
     []
   );
-  
+
   const askStorySubjectAndDeltas = useCallback(
     async ({
       systemHint,
@@ -481,7 +481,7 @@ export const useGame = (withImage: boolean) => {
         "스탯은 정수 delta로만 표기(hp/atk/mp). 예: 괴물과 싸움→ atk+1, hp-10 / 책 읽음→ mp+1 / 피해→ hp-10. " +
         "아이템 변동이 있으면 itemsAdd/itemsRemove에 넣으세요. " +
         "또한 장면에서 '가장 중심이 되는 단일 물체' 1개(subject)를 뽑습니다(사람/군중/배경전체/추상 제외). " +
-        `마지막으로, 생성된 스토리의 분위기에 가장 잘 어울리는 BGM 무드를 다음 목록에서 하나만 골라 'bgmMood' 필드에 추가하세요: [${BGM_MOODS.join(
+        `마지막으로, 장면에서 '가장 중심이 되는 행동' 1개를 뽑아 가장 잘 어울리는 BGM 무드를 다음 목록에서 하나만 골라 'bgmMood' 필드에 추가하세요: [${BGM_MOODS.join(
           ", "
         )}]. 목록에 없으면 'calm'이나 'tense' 중 가장 가까운 것을 선택하고, 애매하면 null. ` +
         "사용자의 행동을 직접 입력하지 않고 클릭할 수 있도록 'recommendedAction'에 다음 추천 행동 1개를 한국어 문장으로 제시하세요. " +
@@ -560,7 +560,7 @@ export const useGame = (withImage: boolean) => {
     },
     [ai, gameState, getAdjustedAtk]
   ); // gameState가 바뀌면 playerState도 바뀌어야 하므로 의존성 추가
-  
+
   const generateSceneImageFromSubject = useCallback(
     async (subject: Subject | null) => {
       setGameState((prev) => ({ ...prev, imgError: "", isImgLoading: true }));
@@ -610,7 +610,7 @@ export const useGame = (withImage: boolean) => {
     },
     [ai, ensureApi, buildImagePromptFromSubject]
   );
-  
+
   const generateHudNotes = useCallback(
     ({
       deltas,
@@ -645,7 +645,7 @@ export const useGame = (withImage: boolean) => {
     },
     []
   );
-  
+
   const applyDeltasAndItems = useCallback(
     ({
       deltas,
@@ -684,7 +684,9 @@ export const useGame = (withImage: boolean) => {
 
         if (itemsAdd?.length) {
           itemsAdd.forEach((itemName) => {
-            const existingItem = newItems.find((item) => item.name === itemName);
+            const existingItem = newItems.find(
+              (item) => item.name === itemName
+            );
             if (existingItem) existingItem.quantity += 1;
             else
               newItems.push({
@@ -939,7 +941,7 @@ export const useGame = (withImage: boolean) => {
     withImage,
     generateSceneImageFromSubject,
   ]);
-  
+
   const submitAction = useCallback(async () => {
     if (
       !ensureApi() ||
@@ -1024,7 +1026,7 @@ export const useGame = (withImage: boolean) => {
     withImage,
     generateSceneImageFromSubject,
   ]);
-  
+
   const goHome = useCallback(() => {
     if (
       window.confirm(
