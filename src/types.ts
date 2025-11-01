@@ -84,7 +84,7 @@ export type AskResult = {
   itemsRemove: string[];
   notes: string[];
   recommendedAction: string;
-  bgmMood: string | null;
+  bgm: string | null;
 };
 
 // 저장 슬롯 타입

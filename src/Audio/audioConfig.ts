@@ -6,15 +6,18 @@
  */
 export const BGM_MAP: { [key: string]: string } = {
   default: "/Audio/bgm/default1.mp3", // 기본 브금
-  calm: "/Audio/bgm/calm1.mp3", // 탐험, 안정
-  tense: "/Audio/bgm/tense1.mp3", // 긴장, 추격
-  combat: "/Audio/bgm/combat1.mp3", // 전투
+  move: "/Audio/bgm/calm1.mp3", // 탐험, 안정
+  run: "/Audio/bgm/tense1.mp3", // 긴장, 추격
+  battle: "/Audio/bgm/battle1.mp3", // 전투
   horror: "/Audio/bgm/horror1.mp3", // 공포, 폐쇄
-  discovery: "/Audio/bgm/discovery1.mp3", // 발견, 신비
-  sad: "/Audio/bgm/sad1.mp3", // 슬픔, 상실
+  eat: "/Audio/bgm/discovery1.mp3", // 발견, 신비
+  defeat: "/Audio/bgm/sad1.mp3", // 슬픔, 상실
+  victory: "/Audio/bgm/victory1.mp3", // 승리, 축하
+  statUp: "/Audio/bgm/statUp1.mp3", // 스탯 상승, 강해짐
+  explore: "/Audio/bgm/explore1.mp3", // 탐험, 신비
 };
 
 /**
  * 🎵 AI가 반환할 수 있는 BGM 무드 목록
  */
-export const BGM_MOODS = ["calm", "tense", "combat", "horror", "discovery", "sad"];
+export const BGM = ["default","calm","move","run", "battle", "eat", "defeat", "victory", "statUp", "explore"];

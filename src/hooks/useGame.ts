@@ -19,7 +19,7 @@ import {
   TEXT_MODEL,
   IMAGE_MODEL,
 } from "../gameConfig";
-import { BGM_MAP, BGM_MOODS } from "../Audio/audioConfig";
+import { BGM, BGM_MAP } from "../Audio/audioConfig";
 
 // ===== 유틸: 아이템 종류 분류 (하드코딩된 목록) =====
 const categorizeItem = (name: string): ItemType => {
@@ -481,21 +481,21 @@ export const useGame = (withImage: boolean) => {
         "스탯은 정수 delta로만 표기(hp/atk/mp). 예: 괴물과 싸움→ atk+1, hp-10 / 책 읽음→ mp+1 / 피해→ hp-10. " +
         "아이템 변동이 있으면 itemsAdd/itemsRemove에 넣으세요. " +
         "또한 장면에서 '가장 중심이 되는 단일 물체' 1개(subject)를 뽑습니다(사람/군중/배경전체/추상 제외). " +
-        `마지막으로, 장면에서 '가장 중심이 되는 행동' 1개를 뽑아 가장 잘 어울리는 BGM 무드를 다음 목록에서 하나만 골라 'bgmMood' 필드에 추가하세요: [${BGM_MOODS.join(
+        `또한 ${BGM.join(
           ", "
-        )}]. 목록에 없으면 'calm'이나 'tense' 중 가장 가까운 것을 선택하고, 애매하면 null. ` +
+        )} 중에 하나를 골라 bgm에 추가하세요` +
         "사용자의 행동을 직접 입력하지 않고 클릭할 수 있도록 'recommendedAction'에 다음 추천 행동 1개를 한국어 문장으로 제시하세요. " +
-        "가능하면 가장 합리적인 행동을 추천하고, 너무 뻔한 행동은 피하세요.\n" +
         "반드시 JSON만 출력. 포맷:\n" +
         "{\n" +
         '  "story": "한국어 스토리...",\n' +
         '  "subject": { "언어": "물체", "en": "subject" },\n' +
-        '  "bgmMood": "tense" | "calm" | "combat" | ... | null,\n' +
+        '  "bgm": "calm",\n' +
         '  "deltas": [ { "stat": "hp"|"atk"|"mp", "delta": -10, "reason": "적에게 맞음" }, ... ],\n' +
         '  "itemsAdd": ["아이템명"...],\n' +
         '  "itemsRemove": ["아이템명"...],\n' +
         '  "recommendedAction": "추천 행동 텍스트"\n' +
         "}";
+        console.log(role);
 
       const content =
         (systemHint ? `${systemHint}\n\n` : "") +
@@ -513,11 +513,13 @@ export const useGame = (withImage: boolean) => {
         ],
         config: {
           temperature: 0.8,
-          maxOutputTokens: 900,
+          maxOutputTokens: 3000,
           topP: 0.95,
           topK: 40,
+          thinkingBudget: 0,
         },
       });
+      console.log(result);
 
       const raw: string = (result?.text ?? "").trim();
       const s = raw.indexOf("{");
@@ -545,7 +547,7 @@ export const useGame = (withImage: boolean) => {
         ? parsed.hudNotes
         : [];
       const recommendedAction: string = (parsed.recommendedAction ?? "").trim();
-      const bgmMood: string | null = (parsed.bgmMood ?? null) as string | null;
+      const bgm: string | null = (parsed.bgm ?? null) as string | null;
 
       return {
         nextStory,
@@ -555,7 +557,7 @@ export const useGame = (withImage: boolean) => {
         itemsRemove,
         notes,
         recommendedAction,
-        bgmMood,
+        bgm,
       };
     },
     [ai, gameState, getAdjustedAtk]
@@ -888,7 +890,7 @@ export const useGame = (withImage: boolean) => {
         itemsAdd,
         itemsRemove,
         recommendedAction,
-        bgmMood,
+        bgm,
       } = await askStorySubjectAndDeltas({
         systemHint:
           "story는 자연스러운 한국어 문단. subject는 단일 물체 1개만. " +
@@ -897,7 +899,7 @@ export const useGame = (withImage: boolean) => {
         userText: chatPrompt,
       });
 
-      const newBgmUrl = (bgmMood && BGM_MAP[bgmMood]) || BGM_MAP["default"];
+      const newBgmUrl = (bgm && BGM_MAP[bgm]) || BGM_MAP["default"];
 
       const out = nextStory || "상황 생성 실패";
       setGameState((prev) => ({
@@ -975,7 +977,7 @@ export const useGame = (withImage: boolean) => {
         itemsAdd,
         itemsRemove,
         recommendedAction,
-        bgmMood,
+        bgm,
       } = await askStorySubjectAndDeltas({
         systemHint:
           "story는 한국어 문단. subject는 단일 물체 1개. " +
@@ -984,7 +986,7 @@ export const useGame = (withImage: boolean) => {
         userText: actionPrompt,
       });
 
-      const newBgmUrl = bgmMood && BGM_MAP[bgmMood];
+      const newBgmUrl = bgm && BGM_MAP[bgm];
 
       const out = nextStory || "이야기 생성 실패";
       setGameState((prev) => ({
