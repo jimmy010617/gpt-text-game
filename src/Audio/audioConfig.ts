@@ -20,4 +20,4 @@ export const BGM_MAP: { [key: string]: string } = {
 /**
  * 🎵 AI가 반환할 수 있는 BGM 무드 목록
  */
-export const BGM = ["wakeup","calm","move","run", "battle", "eat", "defeat", "victory", "statUp", "explore","avoid"];
+export const BGM = ["wakeup","move","run", "battle", "eat", "defeat", "victory", "statUp", "explore","avoid"];

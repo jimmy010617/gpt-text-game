@@ -489,7 +489,7 @@ export const useGame = (withImage: boolean) => {
         "{\n" +
         '  "story": "한국어 스토리...",\n' +
         '  "subject": { "언어": "물체", "en": "subject" },\n' +
-        '  "bgm": "calm",\n' +
+        '  "bgm": ,\n' +
         '  "deltas": [ { "stat": "hp"|"atk"|"mp", "delta": -10, "reason": "적에게 맞음" }, ... ],\n' +
         '  "itemsAdd": ["아이템명"...],\n' +
         '  "itemsRemove": ["아이템명"...],\n' +
