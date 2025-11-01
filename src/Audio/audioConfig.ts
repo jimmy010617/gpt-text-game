@@ -5,16 +5,16 @@
  * (예: public/music/ambient-main.mp3, public/music/explore-calm.mp3 등)
  */
 export const BGM_MAP: { [key: string]: string } = {
-  wakeup: "/Audio/bgm/default.mp3", // 기본 브금
-  move: "/Audio/bgm/move.mp3", // 탐험, 안정
-  run: "/Audio/bgm/run.mp3", // 긴장, 추격
+  wakeup: "/Audio/bgm/wakeup.mp3", //기상 
+  move: "/Audio/bgm/move.mp3", // 이동
+  run: "/Audio/bgm/run.mp3", // 달리기
   battle: "/Audio/bgm/battle.mp3", // 전투
-  avoid: "/Audio/bgm/avoid.mp3", // 공포, 폐쇄
-  eat: "/Audio/bgm/eat.mp3", // 발견, 신비
-  defeat: "/Audio/bgm/defeat.mp3", // 슬픔, 상실
-  victory: "/Audio/bgm/victory.mp3", // 승리, 축하
-  statUp: "/Audio/bgm/statUp.mp3", // 스탯 상승, 강해짐
-  explore: "/Audio/bgm/explore.mp3", // 탐험, 신비
+  avoid: "/Audio/bgm/avoid.mp3", // 피하기
+  eat: "/Audio/bgm/eat.mp3", // 먹기
+  defeat: "/Audio/bgm/defeat.mp3", // 패배
+  victory: "/Audio/bgm/victory.mp3", // 승리
+  statUp: "/Audio/bgm/statUp.mp3", // 스탯 상승
+  explore: "/Audio/bgm/explore.mp3", // 탐색
 };
 
 /**
