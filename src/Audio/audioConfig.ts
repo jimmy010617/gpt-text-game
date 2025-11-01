@@ -5,7 +5,7 @@
  * (예: public/music/ambient-main.mp3, public/music/explore-calm.mp3 등)
  */
 export const BGM_MAP: { [key: string]: string } = {
-  default: "/Audio/bgm/default.mp3", // 기본 브금
+  wakeup: "/Audio/bgm/default.mp3", // 기본 브금
   move: "/Audio/bgm/move.mp3", // 탐험, 안정
   run: "/Audio/bgm/run.mp3", // 긴장, 추격
   battle: "/Audio/bgm/battle.mp3", // 전투
@@ -20,4 +20,4 @@ export const BGM_MAP: { [key: string]: string } = {
 /**
  * 🎵 AI가 반환할 수 있는 BGM 무드 목록
  */
-export const BGM = ["default","calm","move","run", "battle", "eat", "defeat", "victory", "statUp", "explore","avoid"];
+export const BGM = ["wakeup","calm","move","run", "battle", "eat", "defeat", "victory", "statUp", "explore","avoid"];
