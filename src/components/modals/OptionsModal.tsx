@@ -1,6 +1,6 @@
 // src/components/modals/OptionsModal.tsx
 import React, { useState, useEffect } from "react";
-import { GameState, GenreMode, SaveSlot, LoadedSave } from "../../types";
+import { GameState, GenreMode, SaveSlot, LoadedSave, HighlightMap } from "../../types";
 import { GENRES, DEFAULT_INITIAL_STATE } from "../../gameConfig";
 
 interface OptionsModalProps {
@@ -84,6 +84,7 @@ export const OptionsModal: React.FC<OptionsModalProps> = ({
       turnInRun,
       recommendedAction,
       isGameOver,
+      highlights,
       lastDelta, // 🔽 lastDelta 등은 저장 안 함 (로드 시 초기화)
     } = gameState;
     const saveState: LoadedSave = { // 🔽 타입을 LoadedSave로 명시
@@ -108,6 +109,7 @@ export const OptionsModal: React.FC<OptionsModalProps> = ({
       isGameOver, // 🔽 저장
       name: name || `저장 #${slotNumber}`,
       savedAt: new Date().toLocaleString(),
+      highlights,
     };
     try {
       localStorage.setItem(
@@ -173,6 +175,7 @@ export const OptionsModal: React.FC<OptionsModalProps> = ({
         genreMode:
           (loaded.genreMode as GenreMode) ?? prev.genreMode ?? "random-run",
         currentBgm: loaded.currentBgm ?? null,
+        highlights: loaded.highlights ?? prev.highlights ?? {},
       }));
       
       // 🔽 로드한 스탯을 initialStats에도 반영 (옵션 창 동기화)

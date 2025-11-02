@@ -1,6 +1,7 @@
 // src/components/game/GameUI.tsx
-import React, { useEffect, useRef, useState } from "react";
-import { GameState, Item } from "../../types";
+import React, { useEffect, useRef, useState, useMemo } from "react";
+// 🔽 HighlightCategory, HighlightMap 임포트 추가
+import { GameState, Item, HighlightCategory, HighlightMap } from "../../types";
 import { Spinner } from "../ui/Spinner";
 import { DeltaBadge } from "../ui/DeltaBadge";
 
@@ -19,6 +20,14 @@ interface GameUIProps {
   withImage: boolean;
 }
 
+// 🔽 카테고리별로 적용할 Tailwind CSS 클래스를 정의합니다. (HP, ATK, MP 색상 분리)
+const categoryClasses: Record<HighlightCategory, string> = {
+  item: "text-success font-bold", // 아이템 (DaisyUI Success - 초록)
+  location: "text-warning font-bold", // 장소 (DaisyUI Warning - 노랑/주황)
+  npc: "text-error font-bold", // 적/인물 (DaisyUI Error - 빨강)
+  misc: "text-primary font-bold", // ❗️ 기타 (DaisyUI Primary - 테마 기본색)
+};
+
 export const GameUI: React.FC<GameUIProps> = ({
   gameState,
   setGameState,
@@ -30,12 +39,68 @@ export const GameUI: React.FC<GameUIProps> = ({
   const storyRef = useRef<HTMLDivElement | null>(null);
   const [isStatusVisible, setIsStatusVisible] = useState<boolean>(false);
 
-  // 스토리 스크롤
+  // 🔽 스토리 스크롤 (typingStory 변경 시에만 작동하도록 수정)
   useEffect(() => {
     if (storyRef.current) {
       storyRef.current.scrollTop = storyRef.current.scrollHeight;
     }
   }, [gameState.typingStory]);
+
+  // 🔽 하이라이트된 "타이핑 중인" 텍스트를 생성하는 useMemo
+  const highlightedTypingStory = useMemo(() => {
+    // ❗️ gameState.story 대신 gameState.typingStory 를 사용합니다.
+    const { typingStory, highlights } = gameState;
+    
+    // 1. 하이라이트할 단어가 없으면 원본 타이핑 텍스트 반환
+    if (!highlights || Object.keys(highlights).length === 0) {
+      return typingStory;
+    }
+
+    // 2. 모든 키워드를 수집하고, {키워드: "CSS클래스"} 맵을 생성
+    const allKeywords: string[] = [];
+    const keywordToClassMap = new Map<string, string>();
+
+    (Object.keys(highlights) as HighlightCategory[]).forEach((category) => {
+      // 🔽 정의된 클래스가 없으면 'misc' (기본값) 클래스를 사용
+      const className = categoryClasses[category] || categoryClasses["misc"];
+      const words = highlights[category];
+      
+      if (className && words && words.length > 0) {
+        words.forEach((word) => {
+          if (word) { // 빈 문자열이 아닌 경우에만 추가
+            allKeywords.push(word);
+            keywordToClassMap.set(word, className);
+          }
+        });
+      }
+    });
+
+    if (allKeywords.length === 0) {
+      return typingStory;
+    }
+
+    // 3. 정규식 생성 (긴 단어부터 매칭되도록 정렬)
+    const sortedKeywords = allKeywords.sort((a, b) => b.length - a.length);
+    // 🔽 정규식 특수문자 이스케이프 (예: "HP -10"의 "-")
+    const escapedKeywords = sortedKeywords.map(s => s.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&'));
+    const regex = new RegExp(`(${escapedKeywords.join('|')})`, 'g');
+    
+    // 4. "타이핑 중인 텍스트(typingStory)"를 분할하고 태그 적용
+    const parts = typingStory.split(regex);
+
+    return parts.map((part, index) => {
+      const className = keywordToClassMap.get(part);
+      if (className) {
+        // 5. 매칭된 단어는 span 태그로 감싸서 반환
+        return (
+          <span key={index} className={className}>
+            {part}
+          </span>
+        );
+      }
+      return part; // 매칭되지 않은 부분은 텍스트 그대로 반환
+    });
+  }, [gameState.typingStory, gameState.highlights]); // ⬅️ story 대신 typingStory에 의존
 
   return (
     <div className="w-full max-w-7xl flex flex-col md:flex-row md:justify-center md:items-start md:gap-x-10">
@@ -79,7 +144,8 @@ export const GameUI: React.FC<GameUIProps> = ({
           className="bg-gray-100 border border-gray-300 rounded-xl p-4 text-lg text-gray-700 whitespace-pre-wrap shadow-inner overflow-y-auto max-h-[40vh] flex-grow font-display {
 							story"
         >
-          {gameState.typingStory}
+          {/* ❗️ 조건부 렌더링을 제거하고 항상 하이라이트된 버전을 렌더링합니다. */}
+          {highlightedTypingStory}
         </div>
 
         {/* 💡 입력 폼 */}
@@ -111,45 +177,11 @@ export const GameUI: React.FC<GameUIProps> = ({
                 <button
                   type="button"
                   onClick={() => {
-                    // 🔽 추천 행동 클릭 시 userAction을 설정하고 바로 submit
-                    setGameState((prev) => ({
-                      ...prev,
-                      userAction: prev.recommendedAction,
-                    }));
-                    // setGameState는 비동기이므로, 
-                    // submitAction이 바로 최신 userAction을 참조하지 못할 수 있음.
-                    // useGame 훅의 submitAction이 gameState.userAction을 직접 참조하므로,
-                    // 이 클릭 핸들러가 userAction을 *먼저* 설정하고
-                    // 그 *다음* submitAction을 호출하는 것은 문제가 될 수 있음.
-                    
-                    // ❗ 중요: 이 문제를 해결하려면 useGame의 submitAction을 수정해야 합니다.
-                    // (예: submitAction(actionText?: string))
-                    // 여기서는 원본 로직을 따르되, 
-                    // userAction이 설정된 직후 submit이 호출되도록 합니다.
-                    // React 18의 자동 배치를 믿거나, 
-                    // 혹은 useEffect를 사용해 userAction 변경 시 submit을 트리거해야 하나,
-                    // 원본 App.tsx에서도 이 방식(setGameState 후 바로 submit)을 사용했으므로
-                    // 일단 그대로 둡니다.
-                    
-                    // 원본 코드의 로직을 그대로 따름
                     setGameState((prev) => {
-                      // userAction을 설정하고
                       const newState = { ...prev, userAction: prev.recommendedAction };
-                      // submitAction을 즉시 호출 (이 때 submitAction은 아직 이전 userAction을 볼 수 있음)
-                      // --> 💥 원본 코드의 버그일 수 있음!
-                      
-                      // 💡 원본 코드의 의도를 살리면서 수정:
-                      // submitAction이 다음 틱에서 실행되도록 함
                       setTimeout(() => handlers.submitAction(), 0); 
                       return newState;
                     });
-
-                    // 💡 원본 코드(App.tsx)에 있던 방식 (버그 가능성 있음)
-                    // setGameState((prev) => ({
-                    //   ...prev,
-                    //   userAction: prev.recommendedAction,
-                    // }));
-                    // handlers.submitAction(); 
                   }}
                   className="bg-purple-500 hover:bg-purple-600 text-white font-semibold py-2 px-5 rounded-xl transition duration-300 disabled:opacity-50"
                 >

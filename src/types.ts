@@ -45,6 +45,17 @@ export type Genre = {
   promptSeed: string; // 장르 키워드/상황 시드
 };
 
+// 🔽 하이라이트 타입을 정의합니다.
+export type HighlightCategory =
+  | "item"
+  | "location"
+  | "npc"
+  | "misc";
+
+export type HighlightMap = {
+  [key in HighlightCategory]?: string[];
+};
+
 export type GameState = {
   story: string;
   typingStory: string;
@@ -74,6 +85,7 @@ export type GameState = {
   achievements: string[];
   ending: string;
   currentBgm: string | null;
+  highlights?: HighlightMap;
 };
 
 export type AskResult = {
@@ -85,6 +97,7 @@ export type AskResult = {
   notes: string[];
   recommendedAction: string;
   bgm: string | null;
+  highlights?: HighlightMap;
 };
 
 // 저장 슬롯 타입
@@ -118,4 +131,5 @@ export type LoadedSave = {
   recommendedAction?: string;
   isGameOver?: boolean;
   currentBgm?: string | null;
+  highlights?: HighlightMap;
 };

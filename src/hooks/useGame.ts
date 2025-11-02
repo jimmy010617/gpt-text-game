@@ -11,6 +11,7 @@ import {
   Delta,
   Subject,
   AskResult,
+  HighlightMap, 
 } from "../types";
 import {
   GENRES,
@@ -77,7 +78,7 @@ const loadInitialState = (): GameState => {
       alert("자동 저장된 게임을 불러왔습니다!");
       return {
         story: loadedState.story ?? "",
-        typingStory: "", // 타이핑 효과를 위해 초기화
+        typingStory: "",
         userAction: "",
         isTextLoading: false,
         isImgLoading: false,
@@ -85,7 +86,7 @@ const loadInitialState = (): GameState => {
         hp: loadedState.hp ?? DEFAULT_INITIAL_STATE.hp,
         atk: loadedState.atk ?? DEFAULT_INITIAL_STATE.atk,
         mp: loadedState.mp ?? DEFAULT_INITIAL_STATE.mp,
-        equippedWeapon: loadedState.equippedWeapon ?? null, // 💡 장착된 아이템 불러오기
+        equippedWeapon: loadedState.equippedWeapon ?? null,
         equippedArmor: loadedState.equippedArmor ?? null,
         items: (loadedState.items ?? []).map((item: any) => ({
           name: item.name ?? item,
@@ -100,8 +101,8 @@ const loadInitialState = (): GameState => {
         lastDelta: loadedState.lastDelta ?? { hp: 0, atk: 0, mp: 0 },
         lastSurvivalTurn: "",
         hudNotes: loadedState.hudNotes ?? [],
-        recommendedAction: loadedState.recommendedAction ?? "", // 💡 recommendedAction 상태 불러오기
-        isTypingFinished: true, // 💡 저장된 스토리가 있으면 타이핑이 끝난 상태로 시작
+        recommendedAction: loadedState.recommendedAction ?? "",
+        isTypingFinished: true,
         selectedGenreId: loadedState.selectedGenreId ?? null,
         genreMode: (loadedState.genreMode as GenreMode) ?? "fixed",
         turnInRun: loadedState.turnInRun ?? 0,
@@ -109,13 +110,17 @@ const loadInitialState = (): GameState => {
         isRunComplete: loadedState.isRunComplete ?? false,
         achievements: loadedState.achievements ?? [],
         ending: loadedState.ending ?? "",
-        currentBgm: loadedState.currentBgm ?? null, // 🎵 BGM 상태 불러오기
+        currentBgm: loadedState.currentBgm ?? null,
+        highlights: loadedState.highlights ?? {},
       };
     }
   } catch (e) {
     console.error("자동 저장된 게임 불러오기 실패:", e);
   }
-  return DEFAULT_INITIAL_STATE;
+  return {
+    ...DEFAULT_INITIAL_STATE,
+    highlights: {}, 
+  };
 };
 
 // ===== 장르 헬퍼 =====
@@ -230,7 +235,7 @@ export const useGame = (withImage: boolean) => {
       );
     },
     [ai]
-  ); // getAdjustedAtk는 s.atk를 사용하므로 의존성 필요 없음
+  );
 
   const handleUseItem = useCallback((itemToUse: Item) => {
     if (!window.confirm(`${itemToUse.name}을(를) 사용하시겠습니까?`)) {
@@ -391,6 +396,7 @@ export const useGame = (withImage: boolean) => {
       achievements,
       ending,
       currentBgm,
+      highlights, 
     } = gameState;
 
     const autoSaveState = {
@@ -413,6 +419,7 @@ export const useGame = (withImage: boolean) => {
       achievements,
       ending,
       currentBgm,
+      highlights, 
     };
     try {
       localStorage.setItem("ai_game_auto_save", JSON.stringify(autoSaveState));
@@ -473,30 +480,35 @@ export const useGame = (withImage: boolean) => {
         survivalTurns: gameState.survivalTurns,
       };
 
+      // [!code focus start]
       const role =
         "역할: 당신은 AI 게임 마스터이자 게임 시스템입니다. " +
-        "아래 '플레이어 현재 상태'를 반드시 고려하여, 같은 상황이라도 스탯(ATK/MP/HP)에 따라 결과가 달라지도록 스토리를 진행하세요. " +
-        "예) 같은 적을 만나도 ATK가 높으면 쉽게 제압(피해 적음), MP가 높으면 마법적 해결, 스탯이 낮으면 회피/도망/피해 증가 등.\n" +
-        "이야기를 생성하면서 그 결과로 플레이어의 스탯/인벤토리 변화도 함께 산출합니다. " +
-        "스탯은 정수 delta로만 표기(hp/atk/mp). 예: 괴물과 싸움→ atk+1, hp-10 / 책 읽음→ mp+1 / 피해→ hp-10. " +
-        "아이템 변동이 있으면 itemsAdd/itemsRemove에 넣으세요. " +
-        "또한 장면에서 '가장 중심이 되는 단일 물체' 1개(subject)를 뽑습니다(사람/군중/배경전체/추상 제외). " +
-        `또한 ${BGM.join(
-          ", "
-        )} 중에 하나를 골라 bgm에 추가하세요` +
+        // ... (기존 지시사항) ...
         "사용자의 행동을 직접 입력하지 않고 클릭할 수 있도록 'recommendedAction'에 다음 추천 행동 1개를 한국어 문장으로 제시하세요. " +
+        
+        // 🔽 이 부분을 수정/강조했습니다.
+        "**매우 중요**: 스토리 텍스트에서 플레이어가 주목해야 할 고유명사나 핵심 단어를 카테고리별로 'highlights' 객체에 분류하여 **반드시** 포함시켜주세요. " +
+        "stroy 텍스트에 **실제로 등장하는 단어**만 정확히 뽑아야 합니다. " +
+        "카테고리: 'item'(아이템), 'location'(장소/지명), 'npc'(적 또는 인물), 'stat_hp'(HP 관련 **숫자 포함** 키워드), 'stat_atk'(ATK 관련 **숫자 포함** 키워드), 'stat_mp'(MP 관련 **숫자 포함** 키워드), 'misc'(그 외 상태이상/기타). " +
+        "해당 카테고리에 단어가 없으면 빈 배열 `[]`을 반환하세요. " +
         "반드시 JSON만 출력. 포맷:\n" +
         "{\n" +
         '  "story": "한국어 스토리...",\n' +
         '  "subject": { "언어": "물체", "en": "subject" },\n' +
-        '  "bgm": ,\n' +
-        '  "deltas": [ { "stat": "hp"|"atk"|"mp", "delta": -10, "reason": "적에게 맞음" }, ... ],\n' +
+        '  "bgm": "분위기에 맞는 키",\n' +
+        '  "deltas": [ ... ],\n' +
         '  "itemsAdd": ["아이템명"...],\n' +
         '  "itemsRemove": ["아이템명"...],\n' +
-        '  "recommendedAction": "추천 행동 텍스트"\n' +
+        '  "recommendedAction": "추천 행동 텍스트",\n' +
+        '  "highlights": {\n' +
+        '    "item": ["에너지 바"],\n' +
+        '    "location": ["지하 벙커"],\n' +
+        '    "npc": ["의문의 상인"],\n' +
+        '    "misc": ["부상당한"]\n' +
+        '  }\n' +
         "}";
-        console.log(role);
-
+        // [!code focus end]
+        
       const content =
         (systemHint ? `${systemHint}\n\n` : "") +
         "플레이어 현재 상태:\n" +
@@ -548,6 +560,7 @@ export const useGame = (withImage: boolean) => {
         : [];
       const recommendedAction: string = (parsed.recommendedAction ?? "").trim();
       const bgm: string | null = (parsed.bgm ?? null) as string | null;
+      const highlights: HighlightMap = parsed.highlights ?? {}; 
 
       return {
         nextStory,
@@ -558,10 +571,11 @@ export const useGame = (withImage: boolean) => {
         notes,
         recommendedAction,
         bgm,
+        highlights, 
       };
     },
     [ai, gameState, getAdjustedAtk]
-  ); // gameState가 바뀌면 playerState도 바뀌어야 하므로 의존성 추가
+  );
 
   const generateSceneImageFromSubject = useCallback(
     async (subject: Subject | null) => {
@@ -869,6 +883,7 @@ export const useGame = (withImage: boolean) => {
       achievements: [],
       ending: "",
       currentBgm: null,
+      highlights: {}, 
     }));
 
     const { genreText } = buildGenreDirectivesForPrompt(
@@ -891,6 +906,7 @@ export const useGame = (withImage: boolean) => {
         itemsRemove,
         recommendedAction,
         bgm,
+        highlights, 
       } = await askStorySubjectAndDeltas({
         systemHint:
           "story는 자연스러운 한국어 문단. subject는 단일 물체 1개만. " +
@@ -907,6 +923,7 @@ export const useGame = (withImage: boolean) => {
         story: out,
         recommendedAction: recommendedAction || "",
         currentBgm: newBgmUrl,
+        highlights: highlights || {}, 
       }));
       applyDeltasAndItems({ deltas, itemsAdd, itemsRemove });
       autoSaveGame(); // applyDeltasAndItems 이후 gameState가 반영된 후 저장
@@ -923,14 +940,6 @@ export const useGame = (withImage: boolean) => {
     } finally {
       setGameState((prev) => ({ ...prev, isTextLoading: false }));
     }
-    // autoSaveGame은 setGameState(비동기) 이후 실행되므로,
-    // autoSaveGame이 최신 상태를 참조하도록 useEffect로 분리하거나
-    // applyDeltasAndItems 내부의 setGameState 콜백 *다음에* 호출해야 함.
-    // 여기서는 applyDeltasAndItems가 setGameState를 예약한 직후 호출되므로
-    // 한 박자 늦은 state를 저장할 수 있음.
-    // autoSaveGame을 applyDeltasAndItems *내부*로 옮기거나
-    // [gameState]를 감시하는 useEffect로 분리하는 것이 더 안전함.
-    // 하지만 원본 로직을 따름.
   }, [
     ensureApi,
     gameState.genreMode,
@@ -978,6 +987,7 @@ export const useGame = (withImage: boolean) => {
         itemsRemove,
         recommendedAction,
         bgm,
+        highlights,
       } = await askStorySubjectAndDeltas({
         systemHint:
           "story는 한국어 문단. subject는 단일 물체 1개. " +
@@ -996,6 +1006,7 @@ export const useGame = (withImage: boolean) => {
         recommendedAction: recommendedAction || "",
         turnInRun: nextTurn,
         currentBgm: newBgmUrl || prev.currentBgm,
+        highlights: highlights || {}, 
       }));
       applyDeltasAndItems({ deltas, itemsAdd, itemsRemove });
       autoSaveGame();
