@@ -818,7 +818,6 @@ export const useGame = (withImage: boolean) => {
 
   // 타이핑 효과
   useEffect(() => {
-    // ... (이 로직은 이미 완전했음) ...
     if (!gameState.story || gameState.isGameOver) {
       setGameState((prev) => ({
         ...prev,

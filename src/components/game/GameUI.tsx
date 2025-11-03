@@ -25,7 +25,7 @@ const categoryClasses: Record<HighlightCategory, string> = {
   item: "text-success font-bold", // 아이템 (DaisyUI Success - 초록)
   location: "text-warning font-bold", // 장소 (DaisyUI Warning - 노랑/주황)
   npc: "text-error font-bold", // 적/인물 (DaisyUI Error - 빨강)
-  misc: "text-primary font-bold", // ❗️ 기타 (DaisyUI Primary - 테마 기본색)
+  misc: "text-secondry font-bold", // ❗️ 기타 (DaisyUI secondry - 테마 기본색)
 };
 
 export const GameUI: React.FC<GameUIProps> = ({
@@ -195,7 +195,7 @@ export const GameUI: React.FC<GameUIProps> = ({
                   gameState.isTextLoading ||
                   !gameState.userAction
                 }
-                className="btn btn-outline btn-primary disabled:border-gray-700 disabled:text-gray-500"
+                className="btn btn-primary w-full border-primary text-gray font-semibold py-2 px-5 rounded-xl transition duration-300 disabled:opacity-50"
               >
                 {gameState.isTextLoading
                   ? "로딩 중..."
